@@ -45,8 +45,7 @@ final class WakeListener {
 
     private var tapSeen = false
     private var deadStarts = 0
-    private var latestText = "", latestAt = Date.distantPast
-    private var previousText = "", previousAt = Date.distantPast
+    private var history = HeardHistory()
 
     func start() {
         guard !running, let r = Self.makeRecognizer() else { return }
@@ -120,7 +119,7 @@ final class WakeListener {
         req.contextualStrings = WakeWord.current.hints
         if #available(macOS 13.0, *) { req.addsPunctuation = false }
         request = req
-        lock.lock(); currentRequest = req; previousText = latestText; previousAt = latestAt; latestText = ""; lock.unlock()
+        lock.lock(); currentRequest = req; history.newTask(); lock.unlock()
         task = recognizer.recognitionTask(with: req) { [weak self] result, error in
             guard let self, self.running else { return }
             self.lock.lock(); let current = self.currentRequest === req; self.lock.unlock()
@@ -128,7 +127,7 @@ final class WakeListener {
             if let text = result?.bestTranscription.formattedString {
                 WakeLog.write("heard: \(text.suffix(80))")
                 let media = self.mediaPlaying
-                self.lock.lock(); self.latestText = text; self.latestAt = Date(); let prev = self.previousText, prevAt = self.previousAt; self.lock.unlock()
+                self.lock.lock(); self.history.heard(text, at: Date()); let prev = self.history.previous, prevAt = self.history.previousAt; self.lock.unlock()
                 if self.entranceOn, !media, WakeWord.matchesEntrance(text) {
                     WakeLog.write("entrance phrase matched"); WakeLog.event("entrance phrase heard")
                     DispatchQueue.main.async { guard self.running else { return }; self.onEntrance?("phrase"); self.restartTask() }
@@ -148,7 +147,7 @@ final class WakeListener {
                     DispatchQueue.main.async { guard self.running else { return }; self.stop(); self.onWake?(audio, remainder) }
                     return
                 }
-                if !media, WakeWord.greetingThenName(previous: prev, current: text, gap: Date().timeIntervalSince(prevAt)) {
+                if WakeWord.greetingThenName(previous: prev, current: text, gap: Date().timeIntervalSince(prevAt), media: media) {
                     WakeLog.write("wake phrase matched (greeting, then name)"); WakeLog.event("wake word (greeting, then name)")
                     let remainder = WakeWord.stripLeading(text)
                     self.lock.lock(); let audio = self.preRoll.samples; self.lock.unlock()

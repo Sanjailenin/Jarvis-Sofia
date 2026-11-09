@@ -44,12 +44,16 @@ public struct WakeWord: Sendable {
     private static let trailingGreeting = try! NSRegularExpression(pattern: #"\b(?:hey|hay|hei|hai|hi|hello|okay|ok|yo)\W*$"#, options: .caseInsensitive)
     public static let maxGreetingGap: TimeInterval = 8
 
-    public func greetingThenName(previous: String, current: String, gap: TimeInterval) -> Bool {
-        guard gap >= 0, gap <= Self.maxGreetingGap else { return false }
+    public static let maxGreetingGapWithMedia: TimeInterval = 4
+    private static let bareGreeting = try! NSRegularExpression(pattern: #"^\W*(?:hey|hay|hei|hai|hi|hello|okay|ok|yo)\W*$"#, options: .caseInsensitive)
+
+    public func greetingThenName(previous: String, current: String, gap: TimeInterval, media: Bool = false) -> Bool {
+        guard gap >= 0, gap <= (media ? Self.maxGreetingGapWithMedia : Self.maxGreetingGap) else { return false }
         let p = NSRange(previous.startIndex..., in: previous), c = NSRange(current.startIndex..., in: current)
+        if media, Self.bareGreeting.firstMatch(in: previous, range: p) == nil { return false }
         return Self.trailingGreeting.firstMatch(in: previous, range: p) != nil && leadingName.firstMatch(in: current, range: c) != nil
     }
-    public static func greetingThenName(previous: String, current: String, gap: TimeInterval) -> Bool { Self.current.greetingThenName(previous: previous, current: current, gap: gap) }
+    public static func greetingThenName(previous: String, current: String, gap: TimeInterval, media: Bool = false) -> Bool { Self.current.greetingThenName(previous: previous, current: current, gap: gap, media: media) }
 
     public static func matchesEntrance(_ text: String) -> Bool {
         entrance.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
@@ -88,4 +92,24 @@ public struct WakeWord: Sendable {
     public static func standbyCommand(_ text: String) -> String? { current.standbyCommand(text) }
 
     public var hints: [String] { ["Hey \(name)", "Hi \(name)", "Okay \(name)", name, "\(name), go off"] }
+}
+
+public struct HeardHistory: Sendable {
+    public private(set) var latest = "", latestAt = Date.distantPast
+    public private(set) var previous = "", previousAt = Date.distantPast
+    public init() {}
+
+    public mutating func newTask() {
+        if !latest.isEmpty { previous = latest; previousAt = latestAt }
+        latest = ""
+    }
+
+    public mutating func heard(_ text: String, at time: Date) {
+        if !latest.isEmpty, Self.firstWord(text) != Self.firstWord(latest) { previous = latest; previousAt = latestAt }
+        latest = text; latestAt = time
+    }
+
+    private static func firstWord(_ s: String) -> String {
+        s.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).first.map(String.init) ?? ""
+    }
 }

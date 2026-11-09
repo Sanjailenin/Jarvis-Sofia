@@ -93,3 +93,41 @@ struct FalseWakeTests {
         #expect(ClapGate.block(locked: false, secondsSinceKey: 60, secondsSinceClick: 60, macPlaying: false, videoInFront: true) == "video in front")
     }
 }
+
+struct SplitGreetingTests {
+    private let sofia = WakeWord(name: "Sofia")
+
+    @Test func aResetInsideOneTaskKeepsTheGreeting() {
+        var h = HeardHistory()
+        let t = Date()
+        h.heard("Hey", at: t)
+        h.heard("Sofia", at: t.addingTimeInterval(3))
+        #expect(h.previous == "Hey")
+        #expect(sofia.greetingThenName(previous: h.previous, current: "Sofia", gap: 3))
+    }
+
+    @Test func aGrowingResultIsNotASecondUtterance() {
+        var h = HeardHistory()
+        let t = Date()
+        h.heard("Hey", at: t); h.heard("Hey there", at: t.addingTimeInterval(1)); h.heard("hey there how are you", at: t.addingTimeInterval(2))
+        #expect(h.previous == "")
+        #expect(h.latest == "hey there how are you")
+    }
+
+    @Test func aNewTaskMovesTheLastResultBack() {
+        var h = HeardHistory()
+        let t = Date()
+        h.heard("Hey", at: t)
+        h.newTask()
+        #expect(h.previous == "Hey" && h.previousAt == t && h.latest == "")
+        h.newTask()
+        #expect(h.previous == "Hey")
+    }
+
+    @Test func withMediaOnlyABareQuickGreetingCounts() {
+        #expect(sofia.greetingThenName(previous: "Hey", current: "Sofia", gap: 3, media: true))
+        #expect(!sofia.greetingThenName(previous: "Hey", current: "Sofia", gap: 6, media: true))
+        #expect(!sofia.greetingThenName(previous: "and then she said hey", current: "Sofia", gap: 1, media: true))
+        #expect(sofia.greetingThenName(previous: "and then she said hey", current: "Sofia", gap: 1))
+    }
+}
