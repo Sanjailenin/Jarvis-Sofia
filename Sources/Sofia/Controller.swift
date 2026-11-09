@@ -45,6 +45,7 @@ final class Controller {
         nudges.eventWithinHour = { [weak self] in MainActor.assumeIsolated { self?.calendar.eventWithin(minutes: 60) ?? false } }
         settings.$conversation.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.machine.conversation = on } }.store(in: &bag)
         settings.$wakeWord.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.applyWake(on) } }.store(in: &bag)
+        settings.$cleanAudio.removeDuplicates().dropFirst().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { guard let self, self.wake.running, self.wake.cleanAudio != on else { return }; self.wake.stop(); self.wake.start() } }.store(in: &bag)
         settings.$clapSensitivity.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] s in MainActor.assumeIsolated { self?.wake.clapSensitivity = ClapDetector.Sensitivity(rawValue: s) ?? .normal } }.store(in: &bag)
         settings.$entrance.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.wake.entranceOn = on } }.store(in: &bag)
         settings.$nudges.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { guard let self else { return }; on && !self.settings.standby ? self.nudges.start() : self.nudges.stop() } }.store(in: &bag)

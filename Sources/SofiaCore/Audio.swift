@@ -80,3 +80,18 @@ public enum Level {
         return gain <= 1.05 ? samples : samples.map { Int16(max(-32767, min(32767, Double($0) * gain))) }
     }
 }
+
+public struct SilenceProbe {
+    public var seconds: Double
+    private var silent = 0.0
+    private var done = false
+    public init(seconds: Double = 1) { self.seconds = seconds }
+    public mutating func feed(level: Double, dt: Double) -> Bool {
+        guard !done else { return false }
+        if level > 0 { done = true; return false }
+        silent += dt
+        guard silent >= seconds else { return false }
+        done = true
+        return true
+    }
+}

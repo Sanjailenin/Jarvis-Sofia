@@ -58,10 +58,11 @@ Say "Hey <her name>" or press ⌃⌥S and ask for something. If she says the mod
 - "Hey <her name>, …" or ⌃⌥S to talk. Esc cancels. She keeps listening for a follow-up after answering; "thanks" or "that's all" closes.
 - ⌃⌥D dictates: speak, and she types it where your cursor is. Press again to stop early.
 - "<Her name>, go off" puts her to sleep, any time, no "Hey" needed. "Turn off", "shut down", "go to sleep" and "good night" work too. "Hey <her name>", a double clap, the hotkey or the menu bar item wake her.
+- Audio the Mac plays itself (music, a film, a call) is cancelled out of the microphone before the wake word and the clap detector hear it, so it cannot wake her or drown you out. Switch it off under Microphone in Settings if your microphone sounds worse with it.
 - The island follows your pointer across displays; on a screen without a notch it is a pill under the menu bar.
 - Nudges: low battery (earlier when a meeting is coming), disk nearly full, network lost and back.
 - Replies are spoken sentence by sentence as the model writes them, and the model answers without a thinking phase by default; turn "Let the model think" on in Settings if you want slower, more careful answers.
-- Optional entrance: a Spotify track or your own audio file on a double clap or "wake up, daddy's home". Off by default.
+- Optional entrance: a Spotify track or your own audio file on a double clap or "wake up, daddy's home". Off by default. Spotify pauses when the track ends, and quits again if the entrance started it.
 
 For anything no single action covers ("fill in this form", "find the invoice in Mail and download it") she can use the screen, mouse and keyboard step by step with a vision-capable local model (Settings → vision model, default `qwen2.5vl:7b`, pull it with `ollama pull qwen2.5vl:7b`). She prefers real controls from the accessibility tree over pixel clicks, never logs in, pays or deletes unless asked, and never touches a password manager. Switch it off in Settings if you prefer.
 

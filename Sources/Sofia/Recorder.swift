@@ -30,30 +30,18 @@ final class Recorder {
 
     private func attempt(voiceProcessing: Bool) -> Bool {
         let input = engine.inputNode
-        if input.isVoiceProcessingEnabled != voiceProcessing {
-            do { try input.setVoiceProcessingEnabled(voiceProcessing) } catch { if voiceProcessing { return false } }
-        }
-        if voiceProcessing { _ = engine.mainMixerNode }
-        silentProbe = voiceProcessing ? 0 : -1
+        if voiceProcessing { if !CleanMic.enable(engine, for: .recording) { return false } } else { CleanMic.disable(engine) }
+        probe = voiceProcessing ? SilenceProbe() : nil
+        gotBuffer = false
         let inFormat = input.outputFormat(forBus: 0)
-        guard inFormat.sampleRate > 0, let outFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false),
-              let converter = AVAudioConverter(from: inFormat, to: outFormat) else { return false }
+        guard let resampler = MonoResampler(from: inFormat) else { return false }
         input.installTap(onBus: 0, bufferSize: 2048, format: inFormat) { [weak self] buffer, _ in
             guard let self else { return }
-            let ratio = outFormat.sampleRate / inFormat.sampleRate
-            guard let out = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 16) else { return }
-            var supplied = false
-            converter.convert(to: out, error: nil) { _, status in
-                if supplied { status.pointee = .noDataNow; return nil }
-                supplied = true; status.pointee = .haveData; return buffer
-            }
-            guard let ch = out.floatChannelData?[0], out.frameLength > 0 else { return }
+            self.lock.lock(); self.gotBuffer = true; self.lock.unlock()
+            guard let mono = resampler.firstChannel(buffer), let out = resampler.resample(mono), let ch = out.floatChannelData?[0] else { return }
             let buf = UnsafeBufferPointer(start: ch, count: Int(out.frameLength))
             let level = rms(buf)
-            if self.silentProbe >= 0 {
-                if level > 0 { self.silentProbe = -1 }
-                else { self.silentProbe += Double(out.frameLength) / 16000; if self.silentProbe >= 1 { self.silentProbe = -1; DispatchQueue.main.async { self.fallBackToPlainMic() } } }
-            }
+            if self.probe != nil, self.probe?.feed(level: level, dt: Double(out.frameLength) / 16000) == true { DispatchQueue.main.async { self.fallBackToPlainMic() }; return }
             let pcm = buf.map { Int16(max(-1, min(1, $0)) * 32767) }
             let dt = Double(out.frameLength) / 16000
             self.lock.lock()
@@ -69,17 +57,26 @@ final class Recorder {
             }
         }
         engine.prepare()
-        do { try engine.start(); return true }
-        catch { input.removeTap(onBus: 0); return false }
+        do { try engine.start() } catch { input.removeTap(onBus: 0); return false }
+        if voiceProcessing {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self else { return }
+                self.lock.lock(); let got = self.gotBuffer; let done = self.finished; self.lock.unlock()
+                if !got, !done, self.engine.inputNode.isVoiceProcessingEnabled { WakeLog.write("recorder: no audio in 1.5 s with voice processing"); self.fallBackToPlainMic() }
+            }
+        }
+        return true
     }
 
-    private var silentProbe = -1.0
+    private var probe: SilenceProbe?
+    private var gotBuffer = false
 
     @MainActor private func fallBackToPlainMic() {
         lock.lock(); let done = finished; lock.unlock()
         guard !done else { return }
         engine.stop(); engine.inputNode.removeTap(onBus: 0)
-        AppSettings.shared.cleanAudio = false
+WakeLog.event("echo cancellation off (silent input while recording)")
+                AppSettings.shared.cleanAudio = false
         if !attempt(voiceProcessing: false) { finish(.failed("Couldn't start the microphone")) }
     }
 

@@ -23,6 +23,7 @@ final class Entrance: NSObject, AVAudioPlayerDelegate {
 
     private func playSpotify(_ uri: String, start: Double, stopAfter: Double, fallback: String) {
         spotifyTask = Task.detached(priority: .userInitiated) { [weak self] in
+            let wasRunning = !NSWorkspace.shared.runningApplications.filter { $0.bundleIdentifier == "com.spotify.client" }.isEmpty
             let ok = (try? MacRunner.script("tell application \"Spotify\"\nactivate\nplay track \"\(uri)\"\nend tell")) != nil
             guard ok else {
                 WakeLog.write("entrance: Spotify didn't play")
@@ -33,10 +34,21 @@ final class Entrance: NSObject, AVAudioPlayerDelegate {
                 try? await Task.sleep(nanoseconds: 700_000_000)
                 try? MacRunner.script("tell application \"Spotify\" to set player position to \(Int(start))")
             }
-            if stopAfter > 0 {
-                try? await Task.sleep(nanoseconds: UInt64(stopAfter * 1_000_000_000))
-                guard !Task.isCancelled else { return }
-                try? MacRunner.script("tell application \"Spotify\" to pause")
+            var wait = stopAfter
+            if wait <= 0 {
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                if let info = try? MacRunner.script("tell application \"Spotify\" to return ((duration of current track) as string) & \",\" & ((round (player position)) as string)") {
+                    let parts = info.split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+                    if parts.count == 2, parts[0] > 0 { wait = max(1, parts[0] / 1000 - parts[1] + 0.3) }
+                }
+                if wait <= 0 { wait = 240 }
+            }
+            try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            try? MacRunner.script("tell application \"Spotify\" to pause")
+            if !wasRunning {
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                try? MacRunner.script("tell application \"Spotify\" to quit")
             }
         }
     }

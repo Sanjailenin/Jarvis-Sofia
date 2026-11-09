@@ -42,29 +42,44 @@ final class WakeListener {
     private let lock = NSLock()
     private var currentRequest: SFSpeechAudioBufferRecognitionRequest?
 
+    private(set) var cleanAudio = false
+    private var probe: SilenceProbe?
+    private var firstAudioLogged = false
+    private var tapSeen = false
+    private var deadStarts = 0
+
     func start() {
         guard !running, let r = Self.makeRecognizer() else { return }
+        let clean = AppSettings.shared.cleanAudio && CleanMic.enable(engine, for: .listening)
+        if !clean { CleanMic.disable(engine) }
+        cleanAudio = clean
+        probe = clean ? SilenceProbe(seconds: 4) : nil
+        firstAudioLogged = false
+        tapSeen = false
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0 else { return }
         recognizer = r
-        let pcm16 = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)
-        let converter = pcm16.flatMap { AVAudioConverter(from: format, to: $0) }
+        let resampler = MonoResampler(from: format)
         preRoll.clear()
         claps = ClapDetector(sensitivity: clapSensitivity)
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buf, _ in
             guard let self else { return }
             self.lock.lock(); let req = self.currentRequest; self.lock.unlock()
-            req?.append(buf)
-            guard let converter, let pcm16, let out = AVAudioPCMBuffer(pcmFormat: pcm16, frameCapacity: AVAudioFrameCount(Double(buf.frameLength) * 16000 / format.sampleRate) + 16) else { return }
-            var supplied = false
-            converter.convert(to: out, error: nil) { _, status in
-                if supplied { status.pointee = .noDataNow; return nil }
-                supplied = true; status.pointee = .haveData; return buf
+            self.lock.lock(); let firstBuffer = !self.tapSeen; self.tapSeen = true; self.lock.unlock()
+            if firstBuffer { WakeLog.write("microphone delivering: \(buf.frameLength) frames, \(buf.format.channelCount) ch") }
+            guard let resampler, let mono = resampler.firstChannel(buf) else { return }
+            req?.append(mono)
+            guard let out = resampler.resample(mono), let ch = out.floatChannelData?[0] else { return }
+            let floats = UnsafeBufferPointer(start: ch, count: Int(out.frameLength))
+            if self.probe != nil {
+                let level = rms(floats)
+                self.lock.lock(); let broken = self.probe?.feed(level: level, dt: Double(out.frameLength) / 16000) ?? false; let first = level > 0 && !self.firstAudioLogged; if first { self.firstAudioLogged = true }; self.lock.unlock()
+                if first { WakeLog.write("processed audio flowing after \(String(format: "%.1f", Date().timeIntervalSince(self.startedAt))) s") }
+                if broken { DispatchQueue.main.async { self.fallBackToPlainMic() }; return }
             }
-            guard let ch = out.floatChannelData?[0], out.frameLength > 0 else { return }
-            let samples = UnsafeBufferPointer(start: ch, count: Int(out.frameLength)).map { Int16(max(-1, min(1, $0)) * 32767) }
+            let samples = floats.map { Int16(max(-1, min(1, $0)) * 32767) }
             self.lock.lock(); self.preRoll.append(samples); self.lock.unlock()
             if self.entranceOn && !self.videoInFront { self.lock.lock(); let hit = self.claps.feed(samples); self.lock.unlock(); if hit { DispatchQueue.main.async { WakeLog.event("double clap"); self.onEntrance?("clap") } } }
         }
@@ -72,7 +87,17 @@ final class WakeListener {
         do { try engine.start() } catch { input.removeTap(onBus: 0); return }
         running = true
         startedAt = Date()
-        WakeLog.write("listening (\(r.locale.identifier), \(Int(format.sampleRate)) Hz)")
+        let thisStart = startedAt
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self, self.running, self.startedAt == thisStart else { return }
+            self.lock.lock(); let seen = self.tapSeen; self.lock.unlock()
+            if seen { self.deadStarts = 0; return }
+            self.deadStarts += 1
+            WakeLog.write("no audio from the microphone in 3 s (dead start \(self.deadStarts))")
+            if self.deadStarts <= 3 { WakeLog.event("microphone silent at start, restarting") }
+            if self.deadStarts >= 2, self.cleanAudio { self.fallBackToPlainMic() } else { self.stop(); self.start() }
+        }
+        WakeLog.write("listening (\(r.locale.identifier), \(Int(format.sampleRate)) Hz, \(format.channelCount) ch\(clean ? ", echo cancellation" : ""))")
         configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
             guard let self, self.running, Date().timeIntervalSince(self.startedAt) > 3 else { return }
             WakeLog.write("audio device changed, restarting the mic")
@@ -142,6 +167,13 @@ final class WakeListener {
         request?.endAudio(); task?.cancel(); task = nil; request = nil
     }
     private func restartTask() { guard running else { return }; endTask(); beginTask() }
+
+    private func fallBackToPlainMic() {
+        guard running, cleanAudio else { return }
+        WakeLog.write("voice processing gave silence, using the plain microphone"); WakeLog.event("echo cancellation off (silent input)")
+        AppSettings.shared.cleanAudio = false
+        stop(); start()
+    }
 }
 
 enum WakeLog {

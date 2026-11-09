@@ -3,6 +3,17 @@ import Foundation
 @testable import SofiaCore
 
 @Suite struct AudioTests {
+    @Test func silenceProbeFiresOnceAfterASecondOfDigitalSilence() {
+        var p = SilenceProbe()
+        var fired = 0
+        for _ in 0..<12 { if p.feed(level: 0, dt: 0.1) { fired += 1 } }
+        #expect(fired == 1)
+        var q = SilenceProbe()
+        #expect(!q.feed(level: 0, dt: 0.5) && !q.feed(level: 0.0001, dt: 0.5) && !q.feed(level: 0, dt: 5))
+        var r = SilenceProbe(seconds: 0.3)
+        #expect(!r.feed(level: 0, dt: 0.2) && r.feed(level: 0, dt: 0.2))
+    }
+
     @Test func wavHeader() {
         let d = WAV.encode([1, -1, 300])
         #expect(String(decoding: d[0..<4], as: UTF8.self) == "RIFF")

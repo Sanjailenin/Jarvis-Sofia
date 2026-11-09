@@ -153,14 +153,16 @@ enum MacRunner {
         !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty
     }
 
-    nonisolated static func script(_ source: String) throws {
+    @discardableResult
+    nonisolated static func script(_ source: String) throws -> String {
         var err: NSDictionary?
-        NSAppleScript(source: source)?.executeAndReturnError(&err)
+        let result = NSAppleScript(source: source)?.executeAndReturnError(&err)
         if let err {
             let msg = err[NSAppleScript.errorMessage] as? String ?? "AppleScript error"
             let code = err[NSAppleScript.errorNumber] as? Int ?? 0
             throw Failure(code == -1743 ? "needs permission in System Settings → Privacy & Security → Automation" : msg)
         }
+        return result?.stringValue ?? ""
     }
 
     @discardableResult

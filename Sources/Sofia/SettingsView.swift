@@ -46,6 +46,7 @@ struct SettingsView: View {
                 Toggle("Just “\(settings.assistantName), …” for 10 minutes after a conversation", isOn: $settings.casualWake).disabled(!settings.wakeWord)
                 Toggle("Keep listening after she answers", isOn: $settings.conversation)
                 Toggle("Noise suppression and echo cancellation", isOn: $settings.cleanAudio)
+                Text("What this Mac plays is cancelled out of the microphone before the wake word and the clap detector hear it. Turn off if your microphone sounds worse with it.").font(.caption).foregroundStyle(.secondary)
                 Text("⌃⌥Space or ⌃⌥S talks, ⌃⌥D dictates into the field in front, Esc cancels.").font(.caption).foregroundStyle(.secondary)
             }
             Section("Display") {
