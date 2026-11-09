@@ -12,9 +12,9 @@ die() { printf '\n\033[31m%s\033[0m\n' "$1"; exit 1; }
 if [ "${1:-}" = "--uninstall" ]; then
   say "Removing Sofia"
   pkill -x Sofia 2>/dev/null || true
-  rm -rf "$APP_DIR/Sofia.app"
-  rm -rf "$HOME/Library/Application Support/Sofia" "$HOME/Library/Logs/Sofia"
-  defaults delete dev.sofia.app 2>/dev/null || true
+  rm -rf "$APP_DIR/Sofia.app" "$APP_DIR/Sophia.app"
+  rm -rf "$HOME/Library/Application Support/Sofia" "$HOME/Library/Logs/Sofia" "$HOME/Library/Application Support/Sophia" "$HOME/Library/Logs/Sophia"
+  defaults delete dev.sofia.app 2>/dev/null || true; defaults delete dev.sophia.app 2>/dev/null || true
   echo "Done. Ollama and its models were left in place (brew uninstall ollama removes them)."
   exit 0
 fi
@@ -53,13 +53,14 @@ TMP=$(mktemp -d)
 LATEST="$VERSION"
 [ -n "$LATEST" ] || LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 [ -n "$LATEST" ] || die "Couldn't find a release of $REPO. Build from source instead: git clone https://github.com/$REPO && cd sofia && scripts/build-app.sh"
-curl -fsSL -o "$TMP/Sofia.zip" "https://github.com/$REPO/releases/download/$LATEST/Sofia.zip"
-curl -fsSL -o "$TMP/Sofia.zip.sha256" "https://github.com/$REPO/releases/download/$LATEST/Sofia.zip.sha256"
-(cd "$TMP" && shasum -a 256 -c Sofia.zip.sha256 >/dev/null) || die "Checksum mismatch; not installing."
-ditto -x -k "$TMP/Sofia.zip" "$TMP"
-pkill -x Sofia 2>/dev/null || true
-rm -rf "$APP_DIR/Sofia.app"
-mv "$TMP/Sofia.app" "$APP_DIR/Sofia.app"
+ASSET="Sofia"
+curl -fsSL -o "$TMP/$ASSET.zip" "https://github.com/$REPO/releases/download/$LATEST/$ASSET.zip" 2>/dev/null || { ASSET="Sophia"; curl -fsSL -o "$TMP/$ASSET.zip" "https://github.com/$REPO/releases/download/$LATEST/$ASSET.zip" || die "Couldn't download the app from release $LATEST."; }
+curl -fsSL -o "$TMP/$ASSET.zip.sha256" "https://github.com/$REPO/releases/download/$LATEST/$ASSET.zip.sha256" || die "Couldn't download the checksum."
+(cd "$TMP" && shasum -a 256 -c "$ASSET.zip.sha256" >/dev/null) || die "Checksum mismatch; not installing."
+ditto -x -k "$TMP/$ASSET.zip" "$TMP"
+pkill -x Sofia 2>/dev/null || true; pkill -x Sophia 2>/dev/null || true
+rm -rf "$APP_DIR/Sofia.app" "$APP_DIR/Sophia.app"
+mv "$TMP/$ASSET.app" "$APP_DIR/Sofia.app"
 xattr -dr com.apple.quarantine "$APP_DIR/Sofia.app" 2>/dev/null || true
 [ -n "$MODEL" ] && defaults write dev.sofia.app ollamaModel -string "$MODEL"
 
