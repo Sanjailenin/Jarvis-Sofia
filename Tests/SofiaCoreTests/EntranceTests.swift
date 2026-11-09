@@ -14,19 +14,21 @@ struct SeededGenerator: RandomNumberGenerator {
     }
 }
 
+final class Dice { var rng = SeededGenerator(42) }
+
 struct EntranceTests {
-    static var rng = SeededGenerator(42)
-    static func random(_ r: ClosedRange<Int16>) -> Int16 { Int16.random(in: r, using: &rng) }
+    private let dice = Dice()
+    private func random(_ r: ClosedRange<Int16>) -> Int16 { Int16.random(in: r, using: &dice.rng) }
     private func silence(ms: Int) -> [Int16] { Array(repeating: 0, count: 16 * ms) }
-    private func noise(ms: Int, level: Int16 = 300) -> [Int16] { (0..<(16 * ms)).map { _ in Self.random(-level...level) } }
+    private func noise(ms: Int, level: Int16 = 300) -> [Int16] { (0..<(16 * ms)).map { _ in random(-level...level) } }
     private func clap(level: Int16 = 20000, tail: Int16 = 0) -> [Int16] {
-        var out = (0..<(16 * 40)).map { i in Int16(Double(Self.random(-level...level)) * exp(-Double(i) / 60)) }
-        if tail > 0 { for i in 0..<out.count { out[i] = Int16(clamping: Int(out[i]) + Int(Double(Self.random(-tail...tail)) * exp(-Double(i) / 900))) } }
+        var out = (0..<(16 * 40)).map { i in Int16(Double(random(-level...level)) * exp(-Double(i) / 60)) }
+        if tail > 0 { for i in 0..<out.count { out[i] = Int16(clamping: Int(out[i]) + Int(Double(random(-tail...tail)) * exp(-Double(i) / 900))) } }
         return out
     }
     private func syllable(level: Int16 = 9000) -> [Int16] {
         let n = 16 * 120
-        return (0..<n).map { i in Int16(Double(Self.random(-level...level)) * min(1, Double(i) / 160, Double(n - i) / 160)) }
+        return (0..<n).map { i in Int16(Double(random(-level...level)) * min(1, Double(i) / 160, Double(n - i) / 160)) }
     }
     private func feed(_ det: inout ClapDetector, _ s: [Int16]) -> Int {
         var fired = 0, start = 0

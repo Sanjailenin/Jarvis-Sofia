@@ -29,15 +29,13 @@ struct NameTests {
         #expect(WakeWord.variants(of: "Max") == ["max"])
     }
     @Test func standbyClosingAndPromptFollowTheCurrentName() {
-        let saved = WakeWord.current
-        defer { WakeWord.current = saved }
-        WakeWord.current = WakeWord(name: "Nova")
-        #expect(IslandStateMachine.isStandbyPhrase("nova, go off") && !IslandStateMachine.isStandbyPhrase("sofia, go off"))
-        #expect(IslandStateMachine.isStandbyPhrase("go to sleep"))
-        #expect(IslandStateMachine.standbyLine == "Going off. Say Hey Nova or clap twice when you want me back.")
-        #expect(IslandStateMachine.isClosing("thanks nova") && !IslandStateMachine.isClosing("thanks sofia"))
+        let nova = WakeWord(name: "Nova")
+        #expect(IslandStateMachine.isStandbyPhrase("nova, go off", wake: nova) && !IslandStateMachine.isStandbyPhrase("sofia, go off", wake: nova))
+        #expect(IslandStateMachine.isStandbyPhrase("go to sleep", wake: nova))
+        #expect(IslandStateMachine.standbyLine(for: nova) == "Going off. Say Hey Nova or clap twice when you want me back.")
+        #expect(IslandStateMachine.isClosing("thanks nova", wake: nova) && !IslandStateMachine.isClosing("thanks sofia", wake: nova))
         #expect(Prompt.system(ownerName: "Alex", facts: [], channel: "mac", assistantName: "Nova").hasPrefix("You are Nova,"))
-        WakeWord.current = WakeWord(name: "Sofia")
-        #expect(IslandStateMachine.isStandbyPhrase("sophia, go off") && IslandStateMachine.isStandbyPhrase("sofia go off"))
+        let sofia = WakeWord(name: "Sofia")
+        #expect(IslandStateMachine.isStandbyPhrase("sophia, go off", wake: sofia) && IslandStateMachine.isStandbyPhrase("sofia go off", wake: sofia))
     }
 }

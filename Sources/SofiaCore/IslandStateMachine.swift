@@ -54,15 +54,16 @@ public struct IslandStateMachine: Equatable {
         let trailers = #"(?:[\s,.!?;:-]*(?:please|now|for now|thanks|thank you|"# + name + #"))*"#
         return try! NSRegularExpression(pattern: #"^(?:ok(?:ay)?[\s,.!-]*)?(?:(?:that'?s enough|right|please)[\s,.!-]*)?(?:"# + name + #"[\s,.!?;:-]*)?(?:please[\s,]*)?"# + standbyCommands + trailers + #"\W*$"#, options: .caseInsensitive)
     }
-    public static var standbyLine: String { "Going off. Say Hey \(WakeWord.current.name) or clap twice when you want me back." }
+    public static var standbyLine: String { standbyLine(for: WakeWord.current) }
+    public static func standbyLine(for wake: WakeWord) -> String { "Going off. Say Hey \(wake.name) or clap twice when you want me back." }
 
     static func matches(_ re: NSRegularExpression, _ text: String) -> Bool {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return re.firstMatch(in: t, range: NSRange(t.startIndex..., in: t)) != nil
     }
-    public static func isClosing(_ text: String) -> Bool { isStopPhrase(text) || matches(closing(name: WakeWord.current.namePattern), text) }
+    public static func isClosing(_ text: String, wake: WakeWord = WakeWord.current) -> Bool { isStopPhrase(text) || matches(closing(name: wake.namePattern), text) }
     public static func isStopPhrase(_ text: String) -> Bool { matches(stopPhrase, text) }
-    public static func isStandbyPhrase(_ text: String) -> Bool { matches(standbyPhrase(name: WakeWord.current.namePattern), text) }
+    public static func isStandbyPhrase(_ text: String, wake: WakeWord = WakeWord.current) -> Bool { matches(standbyPhrase(name: wake.namePattern), text) }
 
     public mutating func handle(_ event: Event) -> [Effect] {
         if case .escape = event { dictating = false }
