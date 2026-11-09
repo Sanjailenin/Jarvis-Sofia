@@ -27,7 +27,7 @@ final class NotchPanel: NSPanel {
         let described = screens.enumerated().map { i, s in IslandPlacement.Screen(index: i, x: s.frame.minX, y: s.frame.minY, width: s.frame.width, height: s.frame.height, hasNotch: s.safeAreaInsets.top > 0, isMain: s == NSScreen.main) }
         let mode = IslandPlacement.Mode(rawValue: AppSettings.shared.islandScreen) ?? .follow
         let m = NSEvent.mouseLocation
-        let pick = IslandPlacement.choose(described, mode: mode, mouse: (m.x, m.y)) ?? described[0]
+        let pick = IslandPlacement.choose(described, mode: mode, mouse: (Double(m.x), Double(m.y))) ?? described[0]
         let screen = screens[pick.index]
         var notchW: CGFloat = 0, notchH: CGFloat = 32, has = false
         if screen.safeAreaInsets.top > 0, let l = screen.auxiliaryTopLeftArea, let r = screen.auxiliaryTopRightArea {
