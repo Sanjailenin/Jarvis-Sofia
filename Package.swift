@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "Sophia",
+    name: "Sofia",
     platforms: [.macOS(.v13)],
-    products: [.executable(name: "Sophia", targets: ["Sophia"])],
+    products: [.executable(name: "Sofia", targets: ["Sofia"])],
     targets: [
-        .target(name: "SophiaCore"),
-        .executableTarget(name: "Sophia", dependencies: ["SophiaCore"]),
-        .testTarget(name: "SophiaCoreTests", dependencies: ["SophiaCore"]),
+        .target(name: "SofiaCore"),
+        .executableTarget(name: "Sofia", dependencies: ["SofiaCore"]),
+        .testTarget(name: "SofiaCoreTests", dependencies: ["SofiaCore"]),
     ]
 )

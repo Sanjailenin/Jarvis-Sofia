@@ -4,6 +4,8 @@ An honest review of the first public build, with the changes that would make it 
 
 ## Done since 0.1.0
 
+- 0.3.0: the project is SOFIA; users name the assistant and choose her voice in a first-run welcome window; the wake word, standby phrase, prompt, menus and Telegram replies follow the chosen name.
+
 - Ollama's native `/api/chat` with thinking off for Mac-side turns (on for free-form phone requests), and streamed replies spoken sentence by sentence.
 - Spotlight and the Shortcuts CLI run off the main actor; Keychain secrets are read once and cached.
 - Pairing locks for an hour after five wrong codes; the Telegram poll backs off with jitter.
@@ -23,7 +25,7 @@ An honest review of the first public build, with the changes that would make it 
 
 ## Design
 
-- **Two targets, one direction.** `SophiaCore` is pure and tested; `Sophia` touches the system. Keep it that way: anything new that can be a pure function with a test belongs in core. The state machine, the clap detector, the file policy and the command parser are the model to copy.
+- **Two targets, one direction.** `SofiaCore` is pure and tested; `Sofia` touches the system. Keep it that way: anything new that can be a pure function with a test belongs in core. The state machine, the clap detector, the file policy and the command parser are the model to copy.
 - **The controller** owns the voice loop; the phone channel lives in `PhoneChannel`. Standby could move out next.
 - **One provider protocol** covers Ollama, OpenAI-compatible servers and Anthropic, with streaming and a vision flag. Adding a provider is one struct.
 - **Memory** is a JSON list of facts. It is deliberately simple and inspectable. If it grows, a small SQLite store with full-text search is the next step, not a vector database.

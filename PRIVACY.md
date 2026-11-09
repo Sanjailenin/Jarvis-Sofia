@@ -1,13 +1,13 @@
 # Privacy
 
-Sophia is built to keep everything on your Mac.
+Sofia is built to keep everything on your Mac.
 
 **Stays on the Mac**
 - Your voice. Wake-word detection, dictation and requests use Apple's on-device speech recognition. Audio is never written to disk and never sent anywhere.
 - The model. Requests made at the Mac go to Ollama on localhost.
-- Memory. Facts you ask her to remember live in `~/Library/Application Support/Sophia/memory.json`. Open it, edit it, delete it.
+- Memory. Facts you ask her to remember live in `~/Library/Application Support/Sofia/memory.json`. Open it, edit it, delete it.
 - Settings in the app's user defaults; keys and tokens in your macOS Keychain.
-- The trigger log at `~/Library/Logs/Sophia/events.log`: what woke her (wake word, clap, hotkey, a phone message, a remote command) and the app that was in front. Never what you said. Capped at 200 KB.
+- The trigger log at `~/Library/Logs/Sofia/events.log`: what woke her (wake word, clap, hotkey, a phone message, a remote command) and the app that was in front. Never what you said. Capped at 200 KB.
 
 **Leaves the Mac only when you set it up**
 - Your own Telegram bot, through Telegram's API, for messages to and from your phone. Files and screenshots you ask for go into that chat.

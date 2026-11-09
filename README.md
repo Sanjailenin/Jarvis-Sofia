@@ -1,6 +1,6 @@
-# Sophia
+# SOFIA
 
-A voice assistant that lives in the notch of your Mac. Say "Hey Sophia", ask for something, and she does it on the Mac: opens apps and sites, moves windows, plays music, types for you, changes settings. Message her from your phone and she sends you a file from the laptop, a screenshot, or tells you whether it is still on.
+A voice assistant that lives in the notch of your Mac. Give her any name you like and pick her voice at setup, then say "Hey <her name>", ask for something, and she does it on the Mac: opens apps and sites, moves windows, plays music, types for you, changes settings. Message her from your phone and she sends you a file from the laptop, a screenshot, or tells you whether it is still on.
 
 Everything runs on your Mac. The model is a local open model through Ollama. Speech recognition is Apple's on-device engine. Her voice is a British system voice. Nothing leaves the machine except your own Telegram bot and, only if you add keys, ElevenLabs or a cloud model for messages from your phone.
 
@@ -11,36 +11,36 @@ You need a Mac on macOS 13 or later. Apple silicon is recommended; 16 GB of memo
 ### Option 1: one line in Terminal
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Sanjailenin/sophia/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Sanjailenin/sofia/main/install.sh | bash
 ```
 
-The script does, in order: installs Homebrew if you do not have it, installs and starts Ollama, pulls a model sized to your Mac's memory (about 5 GB for 16 GB Macs, 9 GB for 32 GB), downloads the latest Sophia release, checks its SHA-256 against the published checksum, puts `Sophia.app` in `/Applications`, and opens it. Read the script first if you like: it is short and plain bash.
+The script does, in order: installs Homebrew if you do not have it, installs and starts Ollama, pulls a model sized to your Mac's memory (about 5 GB for 16 GB Macs, 9 GB for 32 GB), downloads the latest Sofia release, checks its SHA-256 against the published checksum, puts `Sofia.app` in `/Applications`, and opens it. Read the script first if you like: it is short and plain bash.
 
-Pick a different model with `SOPHIA_MODEL=qwen3:14b` in front of the command. Remove everything later with:
+Pick a different model with `SOFIA_MODEL=qwen3:14b` in front of the command. Remove everything later with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Sanjailenin/sophia/main/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/Sanjailenin/sofia/main/install.sh | bash -s -- --uninstall
 ```
 
 ### Option 2: download the app yourself
 
 1. Install Ollama from [ollama.com](https://ollama.com) or `brew install ollama`, start it, and run `ollama pull qwen3:8b`.
-2. Download `Sophia.zip` from the [latest release](https://github.com/Sanjailenin/sophia/releases/latest), unzip it, and move `Sophia.app` to Applications.
+2. Download `Sofia.zip` from the [latest release](https://github.com/Sanjailenin/sofia/releases/latest), unzip it, and move `Sofia.app` to Applications.
 3. The app is not notarized yet, so the first time right-click it, choose Open, and confirm.
 
 ### Option 3: build from source
 
 ```bash
-git clone https://github.com/Sanjailenin/sophia && cd sophia
+git clone https://github.com/Sanjailenin/sofia && cd sofia
 scripts/test.sh
-scripts/build-app.sh && open build/Sophia.app
+scripts/build-app.sh && open build/Sofia.app
 ```
 
 Needs the Xcode Command Line Tools (`xcode-select --install`), nothing else.
 
 ### First run
 
-Sophia opens her Settings window and macOS asks for permissions as they are needed:
+A welcome window asks two things: **her name** (the default is Sofia; whatever you choose becomes the wake phrase, "Hey <name>") and **her voice**, chosen from every voice installed on your Mac with a Preview button, British voices first. Both can be changed later in Settings. Then macOS asks for permissions as they are needed:
 
 | Permission | Why | Needed for |
 |---|---|---|
@@ -51,13 +51,13 @@ Sophia opens her Settings window and macOS asks for permissions as they are need
 | Calendars | today's events | staying quiet during meetings, the battery nudge before one |
 | Automation (Spotify, Music, System Events) | music control, dark mode, typing | asked the first time each is used |
 
-Say "Hey Sophia" or press ⌃⌥S and ask for something. If she says the model is not reachable, run `ollama serve` in Terminal or check the model name in Settings.
+Say "Hey <her name>" or press ⌃⌥S and ask for something. If she says the model is not reachable, run `ollama serve` in Terminal or check the model name in Settings.
 
 ## Use
 
-- "Hey Sophia, …" or ⌃⌥S to talk. Esc cancels. She keeps listening for a follow-up after answering; "thanks" or "that's all" closes.
+- "Hey <her name>, …" or ⌃⌥S to talk. Esc cancels. She keeps listening for a follow-up after answering; "thanks" or "that's all" closes.
 - ⌃⌥D dictates: speak, and she types it where your cursor is. Press again to stop early.
-- "Sophia, go off" puts her to sleep. "Hey Sophia", a double clap, the hotkey or the menu bar item wake her.
+- "<Her name>, go off" puts her to sleep. "Hey <her name>", a double clap, the hotkey or the menu bar item wake her.
 - The island follows your pointer across displays; on a screen without a notch it is a pill under the menu bar.
 - Nudges: low battery (earlier when a meeting is coming), disk nearly full, network lost and back.
 - Replies are spoken sentence by sentence as the model writes them, and the model answers without a thinking phase by default; turn "Let the model think" on in Settings if you want slower, more careful answers.
@@ -65,12 +65,12 @@ Say "Hey Sophia" or press ⌃⌥S and ask for something. If she says the model i
 
 For anything no single action covers ("fill in this form", "find the invoice in Mail and download it") she can use the screen, mouse and keyboard step by step with a vision-capable local model (Settings → vision model, default `qwen2.5vl:7b`, pull it with `ollama pull qwen2.5vl:7b`). She prefers real controls from the accessibility tree over pixel clicks, never logs in, pays or deletes unless asked, and never touches a password manager. Switch it off in Settings if you prefer.
 
-Things she can do on the Mac, from a fixed list that is checked before anything runs: open, quit and switch apps; open https links and files; volume, mute, dark mode, Wi-Fi, lock screen, screenshot; type text; search the web; find files; play music; open System Settings pages; copy to the clipboard; make a note; open app links such as `spotify:`; move windows left, right, full, centre or to another display; hide and show apps; Focus on and off through two Shortcuts you create ("Sophia Focus On" and "Sophia Focus Off", each with a Set Focus action); change her own settings. Programs and scripts are never opened, and nothing from a model is ever run as a shell command.
+Things she can do on the Mac, from a fixed list that is checked before anything runs: open, quit and switch apps; open https links and files; volume, mute, dark mode, Wi-Fi, lock screen, screenshot; type text; search the web; find files; play music; open System Settings pages; copy to the clipboard; make a note; open app links such as `spotify:`; move windows left, right, full, centre or to another display; hide and show apps; Focus on and off through two Shortcuts you create ("Sofia Focus On" and "Sofia Focus Off", each with a Set Focus action); change her own settings. Programs and scripts are never opened, and nothing from a model is ever run as a shell command.
 
 ## From your phone
 
 1. In Telegram, message @BotFather, send `/newbot`, and copy the token it gives you.
-2. In Sophia's Settings, under "From your phone", paste the token and press Return.
+2. In Sofia's Settings, under "From your phone", paste the token and press Return.
 3. Settings shows a six-digit code. Send it to your bot from your phone. Only that chat is ever answered.
 
 These commands never touch a model:
@@ -93,10 +93,10 @@ Files leave the Mac only from the folders you allow (Desktop, Documents, Downloa
 ## Troubleshooting
 
 - **"Ollama isn't running"**: `brew services start ollama` or `ollama serve`, then `ollama pull <model>`. Check the model name in Settings matches `ollama list`.
-- **She does not hear "Hey Sophia"**: Speech Recognition and Microphone must be allowed for Sophia; the wake word needs an on-device English model, which macOS downloads under System Settings → General → Language & Region. Check the menu bar icon is not the slashed one (standby).
-- **Nothing happens on the Mac when she says she did it**: Accessibility is off for Sophia. System Settings → Privacy & Security → Accessibility.
+- **She does not hear her name**: short names with clear vowels work best; the wake listener also accepts common misspellings of the name you chose. Speech Recognition and Microphone must be allowed for Sofia; the wake word needs an on-device English model, which macOS downloads under System Settings → General → Language & Region. Check the menu bar icon is not the slashed one (standby).
+- **Nothing happens on the Mac when she says she did it**: Accessibility is off for Sofia. System Settings → Privacy & Security → Accessibility.
 - **Telegram does not answer**: the token was saved without pressing Return, or the chat is not paired. Unpair and send the new code.
-- **What woke her?** `~/Library/Logs/Sophia/events.log` lists every trigger with the app that was in front. It never contains what you said.
+- **What woke her?** `~/Library/Logs/Sofia/events.log` lists every trigger with the app that was in front. It never contains what you said.
 
 ## Privacy and safety
 
