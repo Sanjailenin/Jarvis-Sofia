@@ -14,7 +14,7 @@ You need a Mac on macOS 13 or later. Apple silicon is recommended; 16 GB of memo
 curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/install.sh | bash
 ```
 
-The script does, in order: installs Homebrew if you do not have it, installs and starts Ollama, pulls a model sized to your Mac's memory (about 5 GB for 16 GB Macs, 9 GB for 32 GB), downloads the latest Sofia release, checks its SHA-256 against the published checksum, puts `Sofia.app` in `/Applications`, and opens it. Read the script first if you like: it is short and plain bash.
+The script does, in order: uses Ollama if you already have it, or downloads the official Ollama app from ollama.com and starts it (no Homebrew, no password), pulls a model sized to your Mac's memory (about 5 GB for 16 GB Macs, 9 GB for 32 GB), downloads the latest Sofia release, checks its SHA-256 against the published checksum, puts `Sofia.app` in `/Applications` (or `~/Applications` if you are not an administrator), and opens it. Read the script first if you like: it is short and plain bash. The ready-made app is for Apple silicon; on an Intel Mac, build from source (option 3).
 
 Pick a different model with `SOFIA_MODEL=qwen3:14b` in front of the command. Remove everything later with:
 
@@ -93,7 +93,7 @@ Files leave the Mac only from the folders you allow (Desktop, Documents, Downloa
 
 ## Troubleshooting
 
-- **"Ollama isn't running"**: `brew services start ollama` or `ollama serve`, then `ollama pull <model>`. Check the model name in Settings matches `ollama list`.
+- **"Ollama isn't running"**: open the Ollama app (or run `ollama serve` in Terminal), then `ollama pull <model>`. Check the model name in Settings matches `ollama list`.
 - **She does not hear her name**: short names with clear vowels work best; the wake listener also accepts common misspellings of the name you chose. Speech Recognition and Microphone must be allowed for Sofia; the wake word needs an on-device English model, which macOS downloads under System Settings → General → Language & Region. Check the menu bar icon is not the slashed one (standby).
 - **Nothing happens on the Mac when she says she did it**: Accessibility is off for Sofia. System Settings → Privacy & Security → Accessibility.
 - **Telegram does not answer**: the token was saved without pressing Return, or the chat is not paired. Unpair and send the new code.
