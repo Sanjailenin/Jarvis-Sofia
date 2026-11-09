@@ -114,6 +114,12 @@ final class WakeListener {
                     return
                 }
                 let casual = self.casualNow && !self.videoInFront
+                if !casual, !self.videoInFront, WakeWord.standbyCommand(text) != nil {
+                    WakeLog.event("wake word (standby command)")
+                    self.lock.lock(); let audio = self.preRoll.samples; self.lock.unlock()
+                    DispatchQueue.main.async { guard self.running else { return }; self.stop(); self.onWake?(audio, "go off") }
+                    return
+                }
                 if WakeWord.matches(text, casual: casual) {
                     WakeLog.write("wake phrase matched\(WakeWord.matches(text) ? "" : " (casual)")"); WakeLog.event("wake word\(WakeWord.matches(text) ? "" : " (casual)")")
                     let remainder = WakeWord.remainder(text, casual: casual)

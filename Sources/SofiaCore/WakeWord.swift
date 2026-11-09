@@ -9,6 +9,7 @@ public struct WakeWord: Sendable {
     private let full: NSRegularExpression
     private let casual: NSRegularExpression
     private let leadingName: NSRegularExpression
+    private let standby: NSRegularExpression
     private static let entrance = try! NSRegularExpression(
         pattern: #"\b(?:wake\s*up[\s,.!]*(?:daddy|daddies|dad)(?:'?s|\s+is)?(?:\s+home)?|(?:daddy|daddies|dad)(?:'?s|\s+is)\s+home)\b"#, options: .caseInsensitive)
 
@@ -19,6 +20,7 @@ public struct WakeWord: Sendable {
         full = try! NSRegularExpression(pattern: #"\b(?:hey|hay|hei|hai|hi|hello|okay|ok|yo)[\s,.!-]*"# + namePattern + #"\b"#, options: .caseInsensitive)
         casual = try! NSRegularExpression(pattern: #"\b"# + namePattern + #"\b[\s,.!?;:-]+(?=\w)"#, options: .caseInsensitive)
         leadingName = try! NSRegularExpression(pattern: #"^\W*"# + namePattern + #"\b[\s,.!?;:-]*"#, options: .caseInsensitive)
+        standby = try! NSRegularExpression(pattern: #"\b"# + namePattern + #"\b[\s,.!?;:-]*("# + IslandStateMachine.standbyCommands + #")(?:[\s,.!?;:-]*(?:please|now|for now|thanks|thank you))*\W*$"#, options: .caseInsensitive)
     }
 
     public static func variants(of name: String) -> [String] {
@@ -68,5 +70,12 @@ public struct WakeWord: Sendable {
     }
     public static func stripLeading(_ text: String) -> String { current.stripLeading(text) }
 
-    public var hints: [String] { ["Hey \(name)", "Hi \(name)", "Okay \(name)", name] }
+    public func standbyCommand(_ text: String) -> String? {
+        let range = NSRange(text.startIndex..., in: text)
+        guard let m = standby.firstMatch(in: text, range: range), let r = Range(m.range(at: 1), in: text) else { return nil }
+        return String(text[r]).lowercased()
+    }
+    public static func standbyCommand(_ text: String) -> String? { current.standbyCommand(text) }
+
+    public var hints: [String] { ["Hey \(name)", "Hi \(name)", "Okay \(name)", name, "\(name), go off"] }
 }

@@ -57,7 +57,7 @@ Say "Hey <her name>" or press ⌃⌥S and ask for something. If she says the mod
 
 - "Hey <her name>, …" or ⌃⌥S to talk. Esc cancels. She keeps listening for a follow-up after answering; "thanks" or "that's all" closes.
 - ⌃⌥D dictates: speak, and she types it where your cursor is. Press again to stop early.
-- "<Her name>, go off" puts her to sleep. "Hey <her name>", a double clap, the hotkey or the menu bar item wake her.
+- "<Her name>, go off" puts her to sleep, any time, no "Hey" needed. "Turn off", "shut down", "go to sleep" and "good night" work too. "Hey <her name>", a double clap, the hotkey or the menu bar item wake her.
 - The island follows your pointer across displays; on a screen without a notch it is a pill under the menu bar.
 - Nudges: low battery (earlier when a meeting is coming), disk nearly full, network lost and back.
 - Replies are spoken sentence by sentence as the model writes them, and the model answers without a thinking phase by default; turn "Let the model think" on in Settings if you want slower, more careful answers.

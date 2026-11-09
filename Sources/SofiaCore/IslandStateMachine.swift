@@ -49,8 +49,10 @@ public struct IslandStateMachine: Equatable {
 
     static func closing(name: String) -> NSRegularExpression { try! NSRegularExpression(pattern: #"^(?:ok(?:ay)?[, ]*)?(?:thanks|thank you|cheers|great|perfect|cool|nice|got it|alright|all ?right)(?:[, ]*"# + name + #")?\W*$"#, options: .caseInsensitive) }
     static let stopPhrase = try! NSRegularExpression(pattern: #"^(?:ok(?:ay)?[, ]*)?(?:stop|cancel|that'?s all|that is all|that'?s it|goodbye|bye|never ?mind|enough)\W*$"#, options: .caseInsensitive)
+    public static let standbyCommands = #"(?:go (?:off|of|offline|to sleep|sleep|away|dark|quiet)|golf|goof|switch (?:yourself )?off|turn (?:yourself )?off|shut (?:down|off|up)|power (?:off|down)|stand ?by|stop listening|sleep(?: now)?|good ?night|off you go|off)"#
     static func standbyPhrase(name: String) -> NSRegularExpression {
-        try! NSRegularExpression(pattern: #"^(?:ok(?:ay)?[, ]*)?(?:"# + name + #"[, ]*)?(?:(?:please[, ]*)?(?:go (?:off|offline|to sleep|away|dark)|switch (?:yourself )?off|turn (?:yourself )?off|power (?:off|down)|stand ?by|stop listening|sleep now|off you go)(?:[, ]*(?:please|now|"# + name + #"))*)\W*$"#, options: .caseInsensitive)
+        let trailers = #"(?:[\s,.!?;:-]*(?:please|now|for now|thanks|thank you|"# + name + #"))*"#
+        return try! NSRegularExpression(pattern: #"^(?:ok(?:ay)?[\s,.!-]*)?(?:(?:that'?s enough|right|please)[\s,.!-]*)?(?:"# + name + #"[\s,.!?;:-]*)?(?:please[\s,]*)?"# + standbyCommands + trailers + #"\W*$"#, options: .caseInsensitive)
     }
     public static var standbyLine: String { "Going off. Say Hey \(WakeWord.current.name) or clap twice when you want me back." }
 
