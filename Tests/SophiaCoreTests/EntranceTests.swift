@@ -2,17 +2,31 @@ import Testing
 import Foundation
 @testable import SophiaCore
 
+struct SeededGenerator: RandomNumberGenerator {
+    var state: UInt64
+    init(_ seed: UInt64) { state = seed }
+    mutating func next() -> UInt64 {
+        state &+= 0x9E3779B97F4A7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+        return z ^ (z >> 31)
+    }
+}
+
 struct EntranceTests {
+    static var rng = SeededGenerator(42)
+    static func random(_ r: ClosedRange<Int16>) -> Int16 { Int16.random(in: r, using: &rng) }
     private func silence(ms: Int) -> [Int16] { Array(repeating: 0, count: 16 * ms) }
-    private func noise(ms: Int, level: Int16 = 300) -> [Int16] { (0..<(16 * ms)).map { _ in Int16.random(in: -level...level) } }
+    private func noise(ms: Int, level: Int16 = 300) -> [Int16] { (0..<(16 * ms)).map { _ in Self.random(-level...level) } }
     private func clap(level: Int16 = 20000, tail: Int16 = 0) -> [Int16] {
-        var out = (0..<(16 * 40)).map { i in Int16(Double(Int16.random(in: -level...level)) * exp(-Double(i) / 60)) }
-        if tail > 0 { for i in 0..<out.count { out[i] = Int16(clamping: Int(out[i]) + Int(Double(Int16.random(in: -tail...tail)) * exp(-Double(i) / 900))) } }
+        var out = (0..<(16 * 40)).map { i in Int16(Double(Self.random(-level...level)) * exp(-Double(i) / 60)) }
+        if tail > 0 { for i in 0..<out.count { out[i] = Int16(clamping: Int(out[i]) + Int(Double(Self.random(-tail...tail)) * exp(-Double(i) / 900))) } }
         return out
     }
     private func syllable(level: Int16 = 9000) -> [Int16] {
         let n = 16 * 120
-        return (0..<n).map { i in Int16(Double(Int16.random(in: -level...level)) * min(1, Double(i) / 160, Double(n - i) / 160)) }
+        return (0..<n).map { i in Int16(Double(Self.random(-level...level)) * min(1, Double(i) / 160, Double(n - i) / 160)) }
     }
     private func feed(_ det: inout ClapDetector, _ s: [Int16]) -> Int {
         var fired = 0, start = 0
