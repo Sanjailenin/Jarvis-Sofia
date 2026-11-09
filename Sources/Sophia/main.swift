@@ -41,7 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } }.store(in: &bag)
 
         NotificationCenter.default.addObserver(forName: .sophiaEntrance, object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.controller.previewEntrance() } }
-        NotificationCenter.default.addObserver(forName: .sophiaTelegramChanged, object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.controller.startTelegram() } }
+        NotificationCenter.default.addObserver(forName: .sophiaTelegramChanged, object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.controller.phone.start() } }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.panel.reposition(model: self?.controller.model) } }
 
         if UserDefaults.standard.object(forKey: "firstRunDone") == nil { UserDefaults.standard.set(true, forKey: "firstRunDone"); openSettings() }
@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func quit() { NSApp.terminate(nil) }
     @objc func openSettings() {
         if settingsWindow == nil {
-            let view = SettingsView(settings: AppSettings.shared, pairingCode: { [weak self] in self?.controller.telegram.pairingCode ?? "" })
+            let view = SettingsView(settings: AppSettings.shared, pairingCode: { [weak self] in self?.controller.phone.pairingCode ?? "" })
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 700), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             w.title = "Sophia"
             w.contentView = NSHostingView(rootView: view)

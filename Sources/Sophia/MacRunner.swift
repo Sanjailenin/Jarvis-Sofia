@@ -164,7 +164,7 @@ enum MacRunner {
     }
 
     @discardableResult
-    static func tool(_ path: String, _ args: [String]) throws -> String {
+    nonisolated static func tool(_ path: String, _ args: [String]) throws -> String {
         let p = Process(); p.executableURL = URL(fileURLWithPath: path); p.arguments = args
         let pipe = Pipe(); p.standardOutput = pipe; p.standardError = pipe
         try p.run()
@@ -184,5 +184,9 @@ enum MacRunner {
             if i + 1 < lines.count, lines[i + 1].hasPrefix("Device: ") { return String(lines[i + 1].dropFirst(8)) }
         }
         return nil
+    }
+
+    nonisolated static func runTool(_ path: String, _ args: [String]) async throws -> String {
+        try await Task.detached(priority: .userInitiated) { try tool(path, args) }.value
     }
 }

@@ -9,6 +9,9 @@ final class AppSettings: ObservableObject {
     @Published var ownerName: String { didSet { d.set(ownerName, forKey: "ownerName") } }
     @Published var ollamaURL: String { didSet { d.set(ollamaURL, forKey: "ollamaURL") } }
     @Published var ollamaModel: String { didSet { d.set(ollamaModel, forKey: "ollamaModel") } }
+    @Published var visionModel: String { didSet { d.set(visionModel, forKey: "visionModel") } }
+    @Published var allowComputer: Bool { didSet { d.set(allowComputer, forKey: "allowComputer") } }
+    @Published var thinking: Bool { didSet { d.set(thinking, forKey: "thinking") } }
     @Published var phoneProvider: String { didSet { d.set(phoneProvider, forKey: "phoneProvider") } }
     @Published var phoneModel: String { didSet { d.set(phoneModel, forKey: "phoneModel") } }
     @Published var voiceName: String { didSet { d.set(voiceName, forKey: "voiceName") } }
@@ -41,10 +44,10 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    let telegramToken: SecretStore = KeychainSecretStore(service: "dev.sophia.app", account: "telegram-token")
-    let elevenLabsKey: SecretStore = KeychainSecretStore(service: "dev.sophia.app", account: "elevenlabs-key")
-    let openAIKey: SecretStore = KeychainSecretStore(service: "dev.sophia.app", account: "openai-key")
-    let anthropicKey: SecretStore = KeychainSecretStore(service: "dev.sophia.app", account: "anthropic-key")
+    let telegramToken: SecretStore = CachedSecretStore(KeychainSecretStore(service: "dev.sophia.app", account: "telegram-token"))
+    let elevenLabsKey: SecretStore = CachedSecretStore(KeychainSecretStore(service: "dev.sophia.app", account: "elevenlabs-key"))
+    let openAIKey: SecretStore = CachedSecretStore(KeychainSecretStore(service: "dev.sophia.app", account: "openai-key"))
+    let anthropicKey: SecretStore = CachedSecretStore(KeychainSecretStore(service: "dev.sophia.app", account: "anthropic-key"))
 
     init() {
         let d = UserDefaults.standard
@@ -52,6 +55,9 @@ final class AppSettings: ObservableObject {
         ownerName = d.string(forKey: "ownerName") ?? ""
         ollamaURL = d.string(forKey: "ollamaURL") ?? "http://localhost:11434"
         ollamaModel = d.string(forKey: "ollamaModel") ?? "qwen3:8b"
+        visionModel = d.string(forKey: "visionModel") ?? "qwen2.5vl:7b"
+        allowComputer = flag("allowComputer", true)
+        thinking = d.bool(forKey: "thinking")
         phoneProvider = d.string(forKey: "phoneProvider") ?? "ollama"
         phoneModel = d.string(forKey: "phoneModel") ?? ""
         voiceName = d.string(forKey: "voiceName") ?? ""
@@ -75,7 +81,7 @@ final class AppSettings: ObservableObject {
         telegramChatID = d.integer(forKey: "telegramChatID")
     }
 
-    var localProvider: OpenAICompatibleProvider { .ollama(model: ollamaModel, url: ollamaURL) }
+    var localProvider: OllamaProvider { OllamaProvider(url: ollamaURL, model: ollamaModel, think: thinking) }
 
     var phoneProviderInstance: ModelProvider {
         switch phoneProvider {
@@ -85,6 +91,25 @@ final class AppSettings: ObservableObject {
             if let key = anthropicKey.read(), !key.isEmpty { return AnthropicProvider(apiKey: key, model: phoneModel.isEmpty ? "claude-haiku-5-5" : phoneModel) }
         default: break
         }
-        return localProvider
+        return OllamaProvider(url: ollamaURL, model: ollamaModel, think: true)
     }
+
+    var visionProvider: ModelProvider {
+        if OllamaProvider.visionModel(ollamaModel) { return OllamaProvider(url: ollamaURL, model: ollamaModel, think: false) }
+        return OllamaProvider(url: ollamaURL, model: visionModel, think: false)
+    }
+}
+
+final class CachedSecretStore: SecretStore, @unchecked Sendable {
+    private let inner: SecretStore
+    private var cached: String??
+    private let lock = NSLock()
+    init(_ inner: SecretStore) { self.inner = inner }
+    func read() -> String? {
+        lock.lock(); defer { lock.unlock() }
+        if let c = cached { return c }
+        let v = inner.read(); cached = .some(v); return v
+    }
+    func write(_ value: String) throws { lock.lock(); defer { lock.unlock() }; try inner.write(value); cached = .some(value) }
+    func delete() { lock.lock(); defer { lock.unlock() }; inner.delete(); cached = .some(nil) }
 }

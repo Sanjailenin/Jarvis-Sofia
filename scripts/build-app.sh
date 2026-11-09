@@ -20,6 +20,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSUIElement</key><true/>
   <key>NSSpeechRecognitionUsageDescription</key><string>Speech is recognised on this Mac to hear the wake phrase and what you say. Nothing is sent anywhere.</string>
   <key>NSAppleEventsUsageDescription</key><string>Sophia can control music, dark mode and type text for you, only from a fixed list of actions and only when you ask.</string>
+  <key>NSCalendarsUsageDescription</key><string>Sophia reads today's events so she stays quiet during meetings and warns about battery before one. Nothing leaves the Mac.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key><string>Sophia reads today's events so she stays quiet during meetings and warns about battery before one. Nothing leaves the Mac.</string>
   <key>NSMicrophoneUsageDescription</key><string>Sophia listens for the wake phrase and records what you say after it. Audio stays on this Mac.</string>
 </dict></plist>
 PLIST

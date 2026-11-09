@@ -14,7 +14,7 @@ enum RemoteRunner {
         case .status: return Outcome(text: status())
         case .screenPeek: return await screenPeek()
         case .sendFile(let q): return await sendFile(q, settings: settings)
-        case .listFiles(let q): return Outcome(text: listFiles(q, settings: settings))
+        case .listFiles(let q): return Outcome(text: await listFiles(q, settings: settings))
         case .download(let url): return await download(url)
         case .stopRemote, .startRemote: return Outcome(text: "")
         default:
@@ -38,7 +38,7 @@ enum RemoteRunner {
 
     private static func roots(_ settings: AppSettings) -> [String] { FilePolicy.roots(from: settings.remoteRoots, home: FileManager.default.homeDirectoryForCurrentUser.path) }
 
-    static func find(_ query: String, settings: AppSettings, limit: Int = 10) -> [URL] {
+    static func find(_ query: String, settings: AppSettings, limit: Int = 10) async -> [URL] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if q.hasPrefix("/") || q.hasPrefix("~") {
             let p = ((q as NSString).expandingTildeInPath as NSString).standardizingPath
@@ -49,7 +49,7 @@ enum RemoteRunner {
         var args: [String] = []
         for r in roots(settings) { args += ["-onlyin", r] }
         args.append(words.map { "kMDItemFSName == \"*\($0)*\"cd" }.joined(separator: " && ") + " && kMDItemContentTypeTree != \"public.folder\"")
-        let out = (try? MacRunner.tool("/usr/bin/mdfind", args)) ?? ""
+        let out = (try? await MacRunner.runTool("/usr/bin/mdfind", args)) ?? ""
         let urls = out.split(separator: "\n").map { URL(fileURLWithPath: String($0)).resolvingSymlinksInPath() }
             .filter { u in (try? u.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }
         let dated = urls.map { ($0, (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) }
@@ -62,14 +62,14 @@ enum RemoteRunner {
         return "\(u.lastPathComponent) (\(FilePolicy.sizeText(v?.fileSize ?? 0)), \(u.deletingLastPathComponent().lastPathComponent), \(v?.contentModificationDate.map(f.string) ?? "?"))"
     }
 
-    static func listFiles(_ query: String, settings: AppSettings) -> String {
-        let hits = find(query, settings: settings)
+    static func listFiles(_ query: String, settings: AppSettings) async -> String {
+        let hits = await find(query, settings: settings)
         if hits.isEmpty { return "Nothing called “\(query)” in the folders I may send from (\(roots(settings).map { ($0 as NSString).lastPathComponent }.joined(separator: ", ")))." }
         return "\(hits.count) match\(hits.count == 1 ? "" : "es"):\n" + hits.enumerated().map { "\($0.offset + 1). \(describe($0.element))" }.joined(separator: "\n")
     }
 
     static func sendFile(_ query: String, settings: AppSettings) async -> Outcome {
-        let hits = find(query, settings: settings)
+        let hits = await find(query, settings: settings)
         guard let file = hits.first else { return Outcome(text: "Nothing called “\(query)” in the folders I may send from.") }
         if hits.count > 1, !query.hasPrefix("/"), !query.hasPrefix("~") {
             let exact = hits.filter { $0.lastPathComponent.lowercased() == query.lowercased() || $0.deletingPathExtension().lastPathComponent.lowercased() == query.lowercased() }

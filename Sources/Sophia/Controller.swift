@@ -7,15 +7,16 @@ final class Controller {
     let model = IslandModel()
     var panel: NotchPanel?
     private var machine = IslandStateMachine(conversation: AppSettings.shared.conversation)
-    private let settings = AppSettings.shared
+    let settings = AppSettings.shared
     private let recorder = Recorder()
     private let speech = Speech()
     private let wake = WakeListener()
     private let entrance = Entrance()
     private let nudges = NudgeMonitor()
     private let keepAwake = KeepAwake()
-    let telegram = TelegramBot()
-    private let turn = OwnerTurn()
+    let calendar = CalendarWatch()
+    let phone: PhoneChannel
+    let turn: AssistantTurn
     private var bag = Set<AnyCancellable>()
     private var generation = 0
     private var work: Task<Void, Never>?
@@ -25,8 +26,13 @@ final class Controller {
     private var videoTimer: Timer?
     private var escKey: HotKey?
     private var pendingLines: [String] = []
+    private var streaming = false
 
     init() {
+        let progress = ProgressRelay()
+        turn = AssistantTurn(memory: MemoryStore.shared, performer: MacPerformer(settings: AppSettings.shared, progressSink: { progress.send($0) }))
+        phone = PhoneChannel(settings: AppSettings.shared, turn: turn)
+        progress.onLine = { [weak self] line in self?.model.transcript = line }
         model.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         wake.onWake = { [weak self] preRoll, remainder in MainActor.assumeIsolated {
             self?.wakeFromStandby()
@@ -35,14 +41,7 @@ final class Controller {
         } }
         wake.onEntrance = { [weak self] how in MainActor.assumeIsolated { self?.entranceTriggered(how) } }
         nudges.onNudge = { [weak self] line in MainActor.assumeIsolated { self?.say(line) } }
-        telegram.onPaired = { [weak self] chat in MainActor.assumeIsolated { self?.settings.telegramChatID = chat } }
-        telegram.remoteEnabled = { [weak self] in MainActor.assumeIsolated { self?.settings.remoteAccess ?? false } }
-        telegram.setRemoteEnabled = { [weak self] on in MainActor.assumeIsolated { self?.settings.remoteAccess = on } }
-        telegram.freeform = { [weak self] text in
-            guard let self else { return "" }
-            do { return try await self.turn.run(text, channel: "phone", provider: self.settings.phoneProviderInstance, ownerName: self.settings.ownerName).reply }
-            catch { return "I couldn't reach the model: \(error.localizedDescription)" }
-        }
+        nudges.eventWithinHour = { [weak self] in MainActor.assumeIsolated { self?.calendar.eventWithin(minutes: 60) ?? false } }
         settings.$conversation.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.machine.conversation = on } }.store(in: &bag)
         settings.$wakeWord.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.applyWake(on) } }.store(in: &bag)
         settings.$clapSensitivity.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] s in MainActor.assumeIsolated { self?.wake.clapSensitivity = ClapDetector.Sensitivity(rawValue: s) ?? .normal } }.store(in: &bag)
@@ -50,19 +49,15 @@ final class Controller {
         settings.$nudges.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { guard let self else { return }; on && !self.settings.standby ? self.nudges.start() : self.nudges.stop() } }.store(in: &bag)
         settings.$keepAwake.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.keepAwake.enabled = on } }.store(in: &bag)
         settings.$standby.removeDuplicates().dropFirst().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { guard let self else { return }; if on { if self.machine.phase != .speaking { self.enterStandby() } } else { self.resumeFromStandby() } } }.store(in: &bag)
-        settings.$telegramChatID.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] _ in MainActor.assumeIsolated { self?.startTelegram() } }.store(in: &bag)
         keepAwake.start()
         videoTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in Task { @MainActor in guard let self else { return }; self.wake.videoInFront = VideoDetector.isVideoInFront() } }
     }
 
     func startBackground() {
-        startTelegram()
+        phone.start()
+        calendar.start()
         if settings.nudges && !settings.standby { nudges.start() }
-        if settings.entrance && !settings.standby { entrance.play(settings) }
-    }
-
-    func startTelegram() {
-        telegram.start(token: settings.telegramToken.read() ?? "", chatID: settings.telegramChatID, settings: settings)
+        if settings.entrance && !settings.standby { entrance.play(settings, allowSpotify: !calendar.inMeeting) }
     }
 
     func hotkeyPressed() {
@@ -84,13 +79,13 @@ final class Controller {
         dispatch(.say(line))
     }
 
-    func previewEntrance() { entrance.play(settings) }
+    func previewEntrance() { entrance.play(settings, allowSpotify: !calendar.inMeeting) }
 
     private func entranceTriggered(_ how: String) {
         guard settings.entrance, !entrance.inCooldown, !wake.videoInFront else { return }
         if settings.standby { wakeFromStandby() }
         WakeLog.event("entrance (\(how))")
-        entrance.play(settings)
+        entrance.play(settings, allowSpotify: !calendar.inMeeting)
     }
 
     private func enterStandby() {
@@ -151,9 +146,9 @@ final class Controller {
         case .transcribe: transcribe()
         case .transcribeDictation: transcribeDictation()
         case .ask(let t): ask(t)
-        case .speak(let line): speak(line)
-        case .stopSpeaking: speech.stop(); model.level = 0
-        case .cancelRequests: generation += 1; work?.cancel(); work = nil; heldClip = nil; speech.stop(); model.level = 0
+        case .speak(let line): if streaming { speech.add(line); speech.finish(); streaming = false } else { speak(line) }
+        case .stopSpeaking: speech.stop(); streaming = false; model.level = 0
+        case .cancelRequests: generation += 1; work?.cancel(); work = nil; heldClip = nil; speech.stop(); streaming = false; model.level = 0
         case .scheduleErrorDismiss:
             errorTimer?.invalidate()
             errorTimer = Timer.scheduledTimer(withTimeInterval: 3.5, repeats: false) { [weak self] _ in Task { @MainActor in self?.dispatch(.errorTimeout) } }
@@ -214,25 +209,45 @@ final class Controller {
         let gen = generation
         work = Task { [weak self] in
             guard let self else { return }
-            do {
-                let result = try await self.turn.run(text, channel: "mac", provider: self.settings.localProvider, ownerName: self.settings.ownerName)
+            var spokenCount = 0
+            let onSentence: @Sendable (String) -> Void = { sentence in Task { @MainActor in
                 guard gen == self.generation else { return }
-                var line = result.reply
-                if !result.failed.isEmpty { line += " I couldn't " + result.failed.joined(separator: "; ") + "." }
-                self.dispatch(.replyReady(spokenForm(reply: line)))
+                let line = spokenForm(reply: sentence)
+                if spokenCount == 0 {
+                    self.streaming = true
+                    self.beginSpeech()
+                    self.speech.add(line)
+                    self.dispatch(.replyReady(line))
+                } else { self.speech.add(line) }
+                spokenCount += 1
+            } }
+            do {
+                let result = try await self.turn.run(text, channel: "mac", provider: self.settings.localProvider, ownerName: self.settings.ownerName, allowComputer: self.settings.allowComputer, onSentence: onSentence)
+                guard gen == self.generation else { return }
+                var tail = spokenCount == 0 ? spokenForm(reply: result.reply) : ""
+                if !result.failed.isEmpty { tail += (tail.isEmpty ? "" : " ") + "I couldn't " + result.failed.joined(separator: "; ") + "." }
+                if spokenCount == 0 { self.dispatch(.replyReady(tail.isEmpty ? "Done." : tail)) }
+                else { if !tail.isEmpty { self.speech.add(tail) }; self.speech.finish(); self.streaming = false }
             } catch is CancellationError {
             } catch {
                 guard gen == self.generation else { return }
+                self.streaming = false
                 let reachable = await self.settings.localProvider.isReachable()
                 self.dispatch(.failed(reachable ? "The model didn't answer: \(error.localizedDescription)" : "Ollama isn't running, or the model isn't pulled. Start it with: ollama serve"))
             }
         }
     }
 
-    private func speak(_ line: String) {
-        speech.speak(line, voice: settings.voiceName, elevenLabsKey: settings.elevenLabsKey.read(), elevenLabsVoice: settings.elevenLabsVoice,
+    private func beginSpeech() {
+        speech.begin(voice: settings.voiceName, elevenLabsKey: settings.elevenLabsKey.read(), elevenLabsVoice: settings.elevenLabsVoice,
                      onLevel: { [weak self] l in Task { @MainActor in self?.model.level = l } },
                      onDone: { [weak self] in Task { @MainActor in self?.model.level = 0; self?.dispatch(.speechFinished) } })
+    }
+
+    private func speak(_ line: String) {
+        beginSpeech()
+        speech.add(line)
+        speech.finish()
     }
 
     private func updateEscKey() {
@@ -246,4 +261,9 @@ final class Controller {
         if from == .listening && to == .thinking { NSSound(named: "Pop")?.play() }
         if case .error = to { NSSound(named: "Basso")?.play() }
     }
+}
+
+final class ProgressRelay: @unchecked Sendable {
+    var onLine: ((String) -> Void)?
+    func send(_ line: String) { Task { @MainActor in self.onLine?(line) } }
 }

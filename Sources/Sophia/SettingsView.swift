@@ -21,6 +21,9 @@ struct SettingsView: View {
             Section("Model (runs on this Mac)") {
                 TextField("Ollama address", text: $settings.ollamaURL).textFieldStyle(.roundedBorder)
                 TextField("Model", text: $settings.ollamaModel).textFieldStyle(.roundedBorder)
+                TextField("Vision model for screen tasks (e.g. qwen2.5vl:7b, gemma3:12b)", text: $settings.visionModel).textFieldStyle(.roundedBorder)
+                Toggle("Let the model think before answering (slower, more careful)", isOn: $settings.thinking)
+                Toggle("Let Sophia use the screen, mouse and keyboard for multi-step tasks", isOn: $settings.allowComputer)
                 HStack {
                     Text(fields.ollamaState.isEmpty ? "Everything you say to the notch is answered here, on this Mac." : fields.ollamaState).font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -33,7 +36,7 @@ struct SettingsView: View {
                     ForEach(Speech.britishVoices, id: \.identifier) { v in Text("\(v.name) (\(v.quality == .enhanced || v.quality == .premium ? "enhanced" : "standard"))").tag(v.identifier) }
                 }
                 Text("Enhanced voices such as Daniel, Serena or Kate download from System Settings → Accessibility → Spoken Content → System Voice → Manage Voices.").font(.caption).foregroundStyle(.secondary)
-                SecureField("ElevenLabs API key (optional, for a premium voice)", text: $fields.elevenLabsKey).onSubmit { save(settings.elevenLabsKey, fields.elevenLabsKey) }
+                HStack { SecureField("ElevenLabs API key (optional, for a premium voice)", text: $fields.elevenLabsKey); Button("Save") { save(settings.elevenLabsKey, fields.elevenLabsKey) } }
                 TextField("ElevenLabs voice id (optional)", text: $settings.elevenLabsVoice).textFieldStyle(.roundedBorder)
             }
             Section("Wake") {
@@ -62,7 +65,7 @@ struct SettingsView: View {
             }
             Section("From your phone (Telegram)") {
                 Toggle("Let Sophia do things on this Mac when I message her", isOn: $settings.remoteAccess)
-                SecureField("Telegram bot token (from @BotFather)", text: $fields.telegramToken).onSubmit { save(settings.telegramToken, fields.telegramToken); NotificationCenter.default.post(name: .sophiaTelegramChanged, object: nil) }
+                HStack { SecureField("Telegram bot token (from @BotFather)", text: $fields.telegramToken); Button("Save") { save(settings.telegramToken, fields.telegramToken); NotificationCenter.default.post(name: .sophiaTelegramChanged, object: nil) } }
                 if settings.telegramChatID == 0 {
                     Text(pairingCode().isEmpty ? "Save a token, then send the pairing code to your bot from your phone." : "Send this code to your bot from your phone: \(pairingCode())").font(.caption)
                 } else {
@@ -71,10 +74,10 @@ struct SettingsView: View {
                 TextField("Folders files may be sent from (comma-separated; empty = Desktop, Documents, Downloads, Movies, Pictures, Music)", text: $settings.remoteRoots).textFieldStyle(.roundedBorder)
                 Toggle("Keep this Mac awake while plugged in", isOn: $settings.keepAwake)
                 Picker("Model for free-form requests from the phone", selection: $settings.phoneProvider) { Text("Ollama (local)").tag("ollama"); Text("OpenAI").tag("openai"); Text("Anthropic").tag("anthropic") }
-                if settings.phoneProvider == "openai" { SecureField("OpenAI API key", text: $fields.openAIKey).onSubmit { save(settings.openAIKey, fields.openAIKey) } }
-                if settings.phoneProvider == "anthropic" { SecureField("Anthropic API key", text: $fields.anthropicKey).onSubmit { save(settings.anthropicKey, fields.anthropicKey) } }
+                if settings.phoneProvider == "openai" { HStack { SecureField("OpenAI API key", text: $fields.openAIKey); Button("Save") { save(settings.openAIKey, fields.openAIKey) } } }
+                if settings.phoneProvider == "anthropic" { HStack { SecureField("Anthropic API key", text: $fields.anthropicKey); Button("Save") { save(settings.anthropicKey, fields.anthropicKey) } } }
                 if settings.phoneProvider != "ollama" { TextField("Model name (optional)", text: $settings.phoneModel).textFieldStyle(.roundedBorder) }
-                Text("Commands like “send me the thesis pdf”, “screen”, “status”, “lock” never use a model. Only free-form messages do, and only from the phone. Press Return to save a key; keys live in your Keychain.").font(.caption).foregroundStyle(.secondary)
+                Text("Commands like “send me the thesis pdf”, “screen”, “status”, “lock” never use a model. Only free-form messages do, and only from the phone. Keys live in your Keychain.").font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

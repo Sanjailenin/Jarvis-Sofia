@@ -47,7 +47,8 @@ Sophia opens her Settings window and macOS asks for permissions as they are need
 | Microphone | hearing you | everything by voice |
 | Speech Recognition | on-device transcription | the wake word, requests, dictation |
 | Accessibility | moving windows, pressing controls, typing | Mac control, dictation |
-| Screen Recording | screenshots | the `screen` command from your phone |
+| Screen Recording | screenshots | the `screen` command from your phone, screen tasks |
+| Calendars | today's events | staying quiet during meetings, the battery nudge before one |
 | Automation (Spotify, Music, System Events) | music control, dark mode, typing | asked the first time each is used |
 
 Say "Hey Sophia" or press ⌃⌥S and ask for something. If she says the model is not reachable, run `ollama serve` in Terminal or check the model name in Settings.
@@ -58,8 +59,11 @@ Say "Hey Sophia" or press ⌃⌥S and ask for something. If she says the model i
 - ⌃⌥D dictates: speak, and she types it where your cursor is. Press again to stop early.
 - "Sophia, go off" puts her to sleep. "Hey Sophia", a double clap, the hotkey or the menu bar item wake her.
 - The island follows your pointer across displays; on a screen without a notch it is a pill under the menu bar.
-- Nudges: low battery, disk nearly full, network lost and back.
+- Nudges: low battery (earlier when a meeting is coming), disk nearly full, network lost and back.
+- Replies are spoken sentence by sentence as the model writes them, and the model answers without a thinking phase by default; turn "Let the model think" on in Settings if you want slower, more careful answers.
 - Optional entrance: a Spotify track or your own audio file on a double clap or "wake up, daddy's home". Off by default.
+
+For anything no single action covers ("fill in this form", "find the invoice in Mail and download it") she can use the screen, mouse and keyboard step by step with a vision-capable local model (Settings → vision model, default `qwen2.5vl:7b`, pull it with `ollama pull qwen2.5vl:7b`). She prefers real controls from the accessibility tree over pixel clicks, never logs in, pays or deletes unless asked, and never touches a password manager. Switch it off in Settings if you prefer.
 
 Things she can do on the Mac, from a fixed list that is checked before anything runs: open, quit and switch apps; open https links and files; volume, mute, dark mode, Wi-Fi, lock screen, screenshot; type text; search the web; find files; play music; open System Settings pages; copy to the clipboard; make a note; open app links such as `spotify:`; move windows left, right, full, centre or to another display; hide and show apps; Focus on and off through two Shortcuts you create ("Sophia Focus On" and "Sophia Focus Off", each with a Set Focus action); change her own settings. Programs and scripts are never opened, and nothing from a model is ever run as a shell command.
 
