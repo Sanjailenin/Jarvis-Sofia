@@ -26,7 +26,7 @@ final class Entrance: NSObject, AVAudioPlayerDelegate {
             let ok = (try? MacRunner.script("tell application \"Spotify\"\nactivate\nplay track \"\(uri)\"\nend tell")) != nil
             guard ok else {
                 WakeLog.write("entrance: Spotify didn't play")
-                await MainActor.run { self?.playFile(fallback) }
+                await MainActor.run { [weak self] in self?.playFile(fallback) }
                 return
             }
             if start > 0 {

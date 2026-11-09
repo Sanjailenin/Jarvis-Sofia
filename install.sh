@@ -2,8 +2,9 @@
 set -euo pipefail
 
 REPO="${SOPHIA_REPO:-Sanjailenin/sophia}"
-APP_DIR="/Applications"
+APP_DIR="${SOPHIA_APP_DIR:-/Applications}"
 MODEL="${SOPHIA_MODEL:-}"
+VERSION="${SOPHIA_VERSION:-}"
 
 say() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 die() { printf '\n\033[31m%s\033[0m\n' "$1"; exit 1; }
@@ -22,6 +23,7 @@ fi
 MAJOR=$(sw_vers -productVersion | cut -d. -f1)
 [ "$MAJOR" -ge 13 ] || die "Sophia needs macOS 13 or later."
 
+if [ -z "${SOPHIA_SKIP_MODEL:-}" ]; then
 if ! command -v brew >/dev/null 2>&1; then
   say "Installing Homebrew"
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -44,11 +46,13 @@ if [ -z "$MODEL" ]; then
 fi
 say "Pulling the model: $MODEL (this is the slow part)"
 ollama pull "$MODEL"
+fi
 
 say "Downloading Sophia"
 TMP=$(mktemp -d)
-LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-[ -n "$LATEST" ] || die "Couldn't find a release of $REPO. Build from source instead: scripts/build-app.sh"
+LATEST="$VERSION"
+[ -n "$LATEST" ] || LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+[ -n "$LATEST" ] || die "Couldn't find a release of $REPO. Build from source instead: git clone https://github.com/$REPO && cd sophia && scripts/build-app.sh"
 curl -fsSL -o "$TMP/Sophia.zip" "https://github.com/$REPO/releases/download/$LATEST/Sophia.zip"
 curl -fsSL -o "$TMP/Sophia.zip.sha256" "https://github.com/$REPO/releases/download/$LATEST/Sophia.zip.sha256"
 (cd "$TMP" && shasum -a 256 -c Sophia.zip.sha256 >/dev/null) || die "Checksum mismatch; not installing."
@@ -57,8 +61,9 @@ pkill -x Sophia 2>/dev/null || true
 rm -rf "$APP_DIR/Sophia.app"
 mv "$TMP/Sophia.app" "$APP_DIR/Sophia.app"
 xattr -dr com.apple.quarantine "$APP_DIR/Sophia.app" 2>/dev/null || true
-defaults write dev.sophia.app ollamaModel -string "$MODEL"
+[ -n "$MODEL" ] && defaults write dev.sophia.app ollamaModel -string "$MODEL"
 
+if [ -n "${SOPHIA_NO_OPEN:-}" ]; then echo "Installed to $APP_DIR/Sophia.app ($LATEST)."; exit 0; fi
 say "Opening Sophia"
 open "$APP_DIR/Sophia.app"
 cat <<EOF
