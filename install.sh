@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-REPO="${SOFIA_REPO:-Sanjailenin/sofia}"
+REPO="${SOFIA_REPO:-Sanjailenin/Jarvis-Sofia}"
 APP_DIR="${SOFIA_APP_DIR:-/Applications}"
 MODEL="${SOFIA_MODEL:-}"
 VERSION="${SOFIA_VERSION:-}"
@@ -52,7 +52,7 @@ say "Downloading Sofia"
 TMP=$(mktemp -d)
 LATEST="$VERSION"
 [ -n "$LATEST" ] || LATEST=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-[ -n "$LATEST" ] || die "Couldn't find a release of $REPO. Build from source instead: git clone https://github.com/$REPO && cd sofia && scripts/build-app.sh"
+[ -n "$LATEST" ] || die "Couldn't find a release of $REPO. Build from source instead: git clone https://github.com/$REPO && cd Jarvis-Sofia && scripts/build-app.sh"
 ASSET="Sofia"
 curl -fsSL -o "$TMP/$ASSET.zip" "https://github.com/$REPO/releases/download/$LATEST/$ASSET.zip" 2>/dev/null || { ASSET="Sophia"; curl -fsSL -o "$TMP/$ASSET.zip" "https://github.com/$REPO/releases/download/$LATEST/$ASSET.zip" || die "Couldn't download the app from release $LATEST."; }
 curl -fsSL -o "$TMP/$ASSET.zip.sha256" "https://github.com/$REPO/releases/download/$LATEST/$ASSET.zip.sha256" || die "Couldn't download the checksum."

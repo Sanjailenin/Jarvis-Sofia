@@ -11,7 +11,7 @@ You need a Mac on macOS 13 or later. Apple silicon is recommended; 16 GB of memo
 ### Option 1: one line in Terminal
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Sanjailenin/sofia/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/install.sh | bash
 ```
 
 The script does, in order: installs Homebrew if you do not have it, installs and starts Ollama, pulls a model sized to your Mac's memory (about 5 GB for 16 GB Macs, 9 GB for 32 GB), downloads the latest Sofia release, checks its SHA-256 against the published checksum, puts `Sofia.app` in `/Applications`, and opens it. Read the script first if you like: it is short and plain bash.
@@ -19,19 +19,19 @@ The script does, in order: installs Homebrew if you do not have it, installs and
 Pick a different model with `SOFIA_MODEL=qwen3:14b` in front of the command. Remove everything later with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Sanjailenin/sofia/main/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/install.sh | bash -s -- --uninstall
 ```
 
 ### Option 2: download the app yourself
 
 1. Install Ollama from [ollama.com](https://ollama.com) or `brew install ollama`, start it, and run `ollama pull qwen3:8b`.
-2. Download `Sofia.zip` from the [latest release](https://github.com/Sanjailenin/sofia/releases/latest), unzip it, and move `Sofia.app` to Applications.
+2. Download `Sofia.zip` from the [latest release](https://github.com/Sanjailenin/Jarvis-Sofia/releases/latest), unzip it, and move `Sofia.app` to Applications.
 3. The app is not notarized yet, so the first time right-click it, choose Open, and confirm.
 
 ### Option 3: build from source
 
 ```bash
-git clone https://github.com/Sanjailenin/sofia && cd sofia
+git clone https://github.com/Sanjailenin/Jarvis-Sofia && cd Jarvis-Sofia
 scripts/test.sh
 scripts/build-app.sh && open build/Sofia.app
 ```
