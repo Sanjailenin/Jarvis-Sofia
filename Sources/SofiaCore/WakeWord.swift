@@ -11,7 +11,7 @@ public struct WakeWord: Sendable {
     private let leadingName: NSRegularExpression
     private let standby: NSRegularExpression
     private static let entrance = try! NSRegularExpression(
-        pattern: #"\b(?:wake\s*up[\s,.!]*(?:daddy|daddies|dad)(?:'?s|\s+is)?(?:\s+home)?|(?:daddy|daddies|dad)(?:'?s|\s+is)\s+home)\b"#, options: .caseInsensitive)
+        pattern: #"\bwake\s*up[\s,.!]*(?:daddy|daddies|dad)(?:'?s|\s+is)?\s+home\b"#, options: .caseInsensitive)
 
     public init(name rawName: String) {
         let cleaned = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -26,7 +26,7 @@ public struct WakeWord: Sendable {
     public static func variants(of name: String) -> [String] {
         let base = name.lowercased()
         if ["sofia", "sophia"].contains(base) {
-            return ["sofia", "sophia", "sofie", "sofiya", "sophie", "safia", "sofi", "sophea", "zofia", "so fear", "so fia"]
+            return ["sofia", "sophia", "sofie", "sofiya", "sophie", "safia", "sofi", "sophea", "zofia", "so fear", "so fia", "su"]
         }
         var set: [String] = [base]
         func add(_ v: String) { if !v.isEmpty, !set.contains(v) { set.append(v) } }
@@ -40,6 +40,16 @@ public struct WakeWord: Sendable {
         add(dedup)
         return set
     }
+
+    private static let trailingGreeting = try! NSRegularExpression(pattern: #"\b(?:hey|hay|hei|hai|hi|hello|okay|ok|yo)\W*$"#, options: .caseInsensitive)
+    public static let maxGreetingGap: TimeInterval = 8
+
+    public func greetingThenName(previous: String, current: String, gap: TimeInterval) -> Bool {
+        guard gap >= 0, gap <= Self.maxGreetingGap else { return false }
+        let p = NSRange(previous.startIndex..., in: previous), c = NSRange(current.startIndex..., in: current)
+        return Self.trailingGreeting.firstMatch(in: previous, range: p) != nil && leadingName.firstMatch(in: current, range: c) != nil
+    }
+    public static func greetingThenName(previous: String, current: String, gap: TimeInterval) -> Bool { Self.current.greetingThenName(previous: previous, current: current, gap: gap) }
 
     public static func matchesEntrance(_ text: String) -> Bool {
         entrance.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil

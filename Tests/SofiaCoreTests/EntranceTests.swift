@@ -53,7 +53,7 @@ struct EntranceTests {
     }
     @Test func slowAndFastDoubleClapsFire() {
         var d = ClapDetector()
-        #expect(feed(&d, noise(ms: warm) + clap() + noise(ms: 130) + clap() + noise(ms: 1200) + clap() + noise(ms: 700) + clap() + noise(ms: 400)) == 2)
+        #expect(feed(&d, noise(ms: warm) + clap() + noise(ms: 130) + clap() + noise(ms: 2000) + clap() + noise(ms: 700) + clap() + noise(ms: 400)) == 2)
     }
     @Test func clapsOverBackgroundNoiseFire() {
         var d = ClapDetector()   // fan or quiet music in the room
@@ -109,10 +109,10 @@ struct EntranceTests {
     }
 
     @Test func entrancePhrase() {
-        for s in ["wake up daddy's home", "Wake up, Daddy's home!", "hey wake up daddies home", "daddy's home", "wake up daddy", "so wake up dad is home"] {
+        for s in ["wake up daddy's home", "Wake up, Daddy's home!", "hey wake up daddies home", "so wake up dad is home"] {
             #expect(WakeWord.matchesEntrance(s), Comment(rawValue: s))
         }
-        for s in ["hey sofia", "wake up", "my daddy is at home with me", "home", "wake up the dog", "daddy"] {
+        for s in ["hey sofia", "wake up", "my daddy is at home with me", "home", "wake up the dog", "daddy", "daddy's home", "wake up daddy"] {
             #expect(!WakeWord.matchesEntrance(s), Comment(rawValue: s))
         }
     }

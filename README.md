@@ -58,7 +58,7 @@ Say "Hey <her name>" or press ⌃⌥S and ask for something. If she says the mod
 - "Hey <her name>, …" or ⌃⌥S to talk. Esc cancels. She keeps listening for a follow-up after answering; "thanks" or "that's all" closes.
 - ⌃⌥D dictates: speak, and she types it where your cursor is. Press again to stop early.
 - "<Her name>, go off" puts her to sleep, any time, no "Hey" needed. "Turn off", "shut down", "go to sleep" and "good night" work too. "Hey <her name>", a double clap, the hotkey or the menu bar item wake her.
-- Audio the Mac plays itself (music, a film, a call) is cancelled out of the microphone before the wake word and the clap detector hear it, so it cannot wake her or drown you out. Switch it off under Microphone in Settings if your microphone sounds worse with it.
+- While the Mac plays any audio (music, a video, a call), claps and the entrance phrase are ignored and only "Hey <her name>" wakes her. Claps are also ignored while you type or click and while the screen is locked.
 - The island follows your pointer across displays; on a screen without a notch it is a pill under the menu bar.
 - Nudges: low battery (earlier when a meeting is coming), disk nearly full, network lost and back.
 - Replies are spoken sentence by sentence as the model writes them, and the model answers without a thinking phase by default; turn "Let the model think" on in Settings if you want slower, more careful answers.

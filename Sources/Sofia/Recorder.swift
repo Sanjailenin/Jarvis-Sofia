@@ -30,7 +30,7 @@ final class Recorder {
 
     private func attempt(voiceProcessing: Bool) -> Bool {
         let input = engine.inputNode
-        if voiceProcessing { if !CleanMic.enable(engine, for: .recording) { return false } } else { CleanMic.disable(engine) }
+        if voiceProcessing { if !CleanMic.enable(engine) { return false } } else { CleanMic.disable(engine) }
         probe = voiceProcessing ? SilenceProbe() : nil
         gotBuffer = false
         let inFormat = input.outputFormat(forBus: 0)

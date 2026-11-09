@@ -14,6 +14,7 @@ final class WakeListener {
     var onEntrance: ((_ how: String) -> Void)?
     var entranceOn = true
     var videoInFront = false
+    var mediaPlaying: Bool { videoInFront || MacState.audioPlaying() }
     var clapSensitivity: ClapDetector.Sensitivity = .normal { didSet { lock.lock(); claps.sensitivity = clapSensitivity; lock.unlock() } }
     private var claps = ClapDetector()
     var casualUntil = Date.distantPast
@@ -42,19 +43,14 @@ final class WakeListener {
     private let lock = NSLock()
     private var currentRequest: SFSpeechAudioBufferRecognitionRequest?
 
-    private(set) var cleanAudio = false
-    private var probe: SilenceProbe?
-    private var firstAudioLogged = false
     private var tapSeen = false
     private var deadStarts = 0
+    private var latestText = "", latestAt = Date.distantPast
+    private var previousText = "", previousAt = Date.distantPast
 
     func start() {
         guard !running, let r = Self.makeRecognizer() else { return }
-        let clean = AppSettings.shared.cleanAudio && CleanMic.enable(engine, for: .listening)
-        if !clean { CleanMic.disable(engine) }
-        cleanAudio = clean
-        probe = clean ? SilenceProbe(seconds: 4) : nil
-        firstAudioLogged = false
+        CleanMic.disable(engine)
         tapSeen = false
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
@@ -73,15 +69,12 @@ final class WakeListener {
             req?.append(mono)
             guard let out = resampler.resample(mono), let ch = out.floatChannelData?[0] else { return }
             let floats = UnsafeBufferPointer(start: ch, count: Int(out.frameLength))
-            if self.probe != nil {
-                let level = rms(floats)
-                self.lock.lock(); let broken = self.probe?.feed(level: level, dt: Double(out.frameLength) / 16000) ?? false; let first = level > 0 && !self.firstAudioLogged; if first { self.firstAudioLogged = true }; self.lock.unlock()
-                if first { WakeLog.write("processed audio flowing after \(String(format: "%.1f", Date().timeIntervalSince(self.startedAt))) s") }
-                if broken { DispatchQueue.main.async { self.fallBackToPlainMic() }; return }
-            }
             let samples = floats.map { Int16(max(-1, min(1, $0)) * 32767) }
             self.lock.lock(); self.preRoll.append(samples); self.lock.unlock()
-            if self.entranceOn && !self.videoInFront { self.lock.lock(); let hit = self.claps.feed(samples); self.lock.unlock(); if hit { DispatchQueue.main.async { WakeLog.event("double clap"); self.onEntrance?("clap") } } }
+            if self.entranceOn && !self.videoInFront {
+                self.lock.lock(); let hit = self.claps.feed(samples); self.lock.unlock()
+                if hit { DispatchQueue.main.async { self.heardDoubleClap() } }
+            }
         }
         engine.prepare()
         do { try engine.start() } catch { input.removeTap(onBus: 0); return }
@@ -95,9 +88,10 @@ final class WakeListener {
             self.deadStarts += 1
             WakeLog.write("no audio from the microphone in 3 s (dead start \(self.deadStarts))")
             if self.deadStarts <= 3 { WakeLog.event("microphone silent at start, restarting") }
-            if self.deadStarts >= 2, self.cleanAudio { self.fallBackToPlainMic() } else { self.stop(); self.start() }
+            if self.deadStarts >= 6 { WakeLog.event("microphone silent, wake word paused"); self.stop(); return }
+            self.stop(); self.start()
         }
-        WakeLog.write("listening (\(r.locale.identifier), \(Int(format.sampleRate)) Hz, \(format.channelCount) ch\(clean ? ", echo cancellation" : ""))")
+        WakeLog.write("listening (\(r.locale.identifier), \(Int(format.sampleRate)) Hz, \(format.channelCount) ch)")
         configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
             guard let self, self.running, Date().timeIntervalSince(self.startedAt) > 3 else { return }
             WakeLog.write("audio device changed, restarting the mic")
@@ -126,19 +120,21 @@ final class WakeListener {
         req.contextualStrings = WakeWord.current.hints
         if #available(macOS 13.0, *) { req.addsPunctuation = false }
         request = req
-        lock.lock(); currentRequest = req; lock.unlock()
+        lock.lock(); currentRequest = req; previousText = latestText; previousAt = latestAt; latestText = ""; lock.unlock()
         task = recognizer.recognitionTask(with: req) { [weak self] result, error in
             guard let self, self.running else { return }
             self.lock.lock(); let current = self.currentRequest === req; self.lock.unlock()
             guard current else { return }
             if let text = result?.bestTranscription.formattedString {
                 WakeLog.write("heard: \(text.suffix(80))")
-                if self.entranceOn, !self.videoInFront, WakeWord.matchesEntrance(text) {
+                let media = self.mediaPlaying
+                self.lock.lock(); self.latestText = text; self.latestAt = Date(); let prev = self.previousText, prevAt = self.previousAt; self.lock.unlock()
+                if self.entranceOn, !media, WakeWord.matchesEntrance(text) {
                     WakeLog.write("entrance phrase matched"); WakeLog.event("entrance phrase heard")
                     DispatchQueue.main.async { guard self.running else { return }; self.onEntrance?("phrase"); self.restartTask() }
                     return
                 }
-                let casual = self.casualNow && !self.videoInFront
+                let casual = self.casualNow && !media
                 if !casual, !self.videoInFront, WakeWord.standbyCommand(text) != nil {
                     WakeLog.event("wake word (standby command)")
                     self.lock.lock(); let audio = self.preRoll.samples; self.lock.unlock()
@@ -148,6 +144,13 @@ final class WakeListener {
                 if WakeWord.matches(text, casual: casual) {
                     WakeLog.write("wake phrase matched\(WakeWord.matches(text) ? "" : " (casual)")"); WakeLog.event("wake word\(WakeWord.matches(text) ? "" : " (casual)")")
                     let remainder = WakeWord.remainder(text, casual: casual)
+                    self.lock.lock(); let audio = self.preRoll.samples; self.lock.unlock()
+                    DispatchQueue.main.async { guard self.running else { return }; self.stop(); self.onWake?(audio, remainder) }
+                    return
+                }
+                if !media, WakeWord.greetingThenName(previous: prev, current: text, gap: Date().timeIntervalSince(prevAt)) {
+                    WakeLog.write("wake phrase matched (greeting, then name)"); WakeLog.event("wake word (greeting, then name)")
+                    let remainder = WakeWord.stripLeading(text)
                     self.lock.lock(); let audio = self.preRoll.samples; self.lock.unlock()
                     DispatchQueue.main.async { guard self.running else { return }; self.stop(); self.onWake?(audio, remainder) }
                     return
@@ -168,11 +171,13 @@ final class WakeListener {
     }
     private func restartTask() { guard running else { return }; endTask(); beginTask() }
 
-    private func fallBackToPlainMic() {
-        guard running, cleanAudio else { return }
-        WakeLog.write("voice processing gave silence, using the plain microphone"); WakeLog.event("echo cancellation off (silent input)")
-        AppSettings.shared.cleanAudio = false
-        stop(); start()
+    private func heardDoubleClap() {
+        if let why = ClapGate.block(locked: MacState.screenLocked(), secondsSinceKey: MacState.secondsSinceKey(),
+                                    secondsSinceClick: MacState.secondsSinceClick(), macPlaying: MacState.audioPlaying(), videoInFront: videoInFront) {
+            WakeLog.write("double clap ignored: \(why)"); WakeLog.event("double clap ignored (\(why))")
+            return
+        }
+        WakeLog.event("double clap"); onEntrance?("clap")
     }
 }
 

@@ -1,16 +1,10 @@
 import AVFoundation
 
 enum CleanMic {
-    enum Purpose { case listening, recording }
-
-    static func enable(_ engine: AVAudioEngine, for purpose: Purpose) -> Bool {
+    static func enable(_ engine: AVAudioEngine) -> Bool {
         let input = engine.inputNode
         if !input.isVoiceProcessingEnabled {
             do { try input.setVoiceProcessingEnabled(true) } catch { return false }
-        }
-        if #available(macOS 14.0, *) {
-            input.isVoiceProcessingAGCEnabled = purpose == .recording
-            input.voiceProcessingOtherAudioDuckingConfiguration = AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: purpose == .listening ? .min : .default)
         }
         _ = engine.mainMixerNode
         return true
