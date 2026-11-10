@@ -32,6 +32,9 @@ cat > "$ENT" <<XML
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>com.apple.security.cs.disable-library-validation</key><true/>
+  <key>com.apple.security.device.audio-input</key><true/>
+  <key>com.apple.security.automation.apple-events</key><true/>
+  <key>com.apple.security.personal-information.calendars</key><true/>
 </dict></plist>
 XML
 codesign --force --deep --options runtime --entitlements "$ENT" --sign "$IDENTITY" "$APP" 2>&1 | grep -v "replacing existing signature" || true
