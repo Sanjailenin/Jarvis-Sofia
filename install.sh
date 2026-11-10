@@ -28,7 +28,6 @@ main() {
   local major
   major=$(sw_vers -productVersion | cut -d. -f1)
   [ "$major" -ge 13 ] || die "Sofia needs macOS 13 or later."
-  [ "$(uname -m)" = "arm64" ] || die "The ready-made app needs an Apple silicon Mac. On an Intel Mac, build it from source: git clone https://github.com/$REPO && cd Jarvis-Sofia && scripts/build-app.sh"
   mkdir -p "$APP_DIR" || die "Can't create $APP_DIR."
 
   if [ -z "${SOFIA_SKIP_MODEL:-}" ]; then
@@ -111,11 +110,24 @@ setup_model() {
   "$OLLAMA" pull "$MODEL" </dev/null || die "Couldn't download the model $MODEL. Check your connection and run this again."
 }
 
-VOICES_VERSION="kokoro-multi-lang-v1_0 sherpa-onnx-v1.13.8"
-ENGINE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-v1.13.8-osx-arm64-shared-lib.tar.bz2"
-ENGINE_SHA="ae77050cdae565496059d96f5ab33d77b397a0864282a4e4a26e3b3b3effb948"
+ENGINE_VERSION="sherpa-onnx-v1.13.8"
 VOICES_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2"
 VOICES_SHA="60703707bc05ccd48d60e1eb723f38b07d6e474795a0b6a588d7220400e0f7a4"
+KWS_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2"
+KWS_SHA="f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a"
+KWS_DIR="sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
+
+engine_for_this_mac() {
+  if [ "$(uname -m)" = "arm64" ]; then
+    ENGINE_NAME="$ENGINE_VERSION-osx-arm64-shared-lib"
+    ENGINE_SHA="ae77050cdae565496059d96f5ab33d77b397a0864282a4e4a26e3b3b3effb948"
+  else
+    ENGINE_NAME="$ENGINE_VERSION-osx-x64-shared-lib"
+    ENGINE_SHA="0f88371565a06372889c76266e253abd1b415fcc6f98232cabd968933efb0711"
+  fi
+  ENGINE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/$ENGINE_NAME.tar.bz2"
+  VOICES_VERSION="kokoro-multi-lang-v1_0 $KWS_DIR $ENGINE_NAME"
+}
 
 fetch_checked() {
   curl -fL --progress-bar -o "$2" "$1" </dev/null || return 1
@@ -123,23 +135,29 @@ fetch_checked() {
 }
 
 setup_voices() {
+  engine_for_this_mac
   local dest="$HOME/Library/Application Support/Sofia/Voices"
   if [ "$(cat "$dest/version" 2>/dev/null)" = "$VOICES_VERSION" ]; then
     return 0
   fi
-  say "Downloading her voices (about 360 MB, once)"
+  say "Downloading her voices and wake-word model (about 380 MB, once)"
   local tmp
   tmp=$(mktemp -d)
-  if ! fetch_checked "$ENGINE_URL" "$tmp/engine.tar.bz2" "$ENGINE_SHA" || ! fetch_checked "$VOICES_URL" "$tmp/voices.tar.bz2" "$VOICES_SHA"; then
+  if ! fetch_checked "$ENGINE_URL" "$tmp/engine.tar.bz2" "$ENGINE_SHA" || ! fetch_checked "$VOICES_URL" "$tmp/voices.tar.bz2" "$VOICES_SHA" || ! fetch_checked "$KWS_URL" "$tmp/kws.tar.bz2" "$KWS_SHA"; then
     rm -rf "$tmp"
-    echo "Couldn't download the voices, so Sofia will use the Mac's own voice. Run this again later to add them."
+    echo "Couldn't download the voices, so Sofia will use the Mac's own voice and Apple's speech recognition only. Run this again later to add them."
     return 0
   fi
-  mkdir -p "$tmp/out/lib" "$tmp/out/kokoro"
+  mkdir -p "$tmp/out/lib" "$tmp/out/kokoro" "$tmp/out/kws"
   tar -xjf "$tmp/engine.tar.bz2" -C "$tmp" </dev/null
-  cp "$tmp"/sherpa-onnx-v1.13.8-osx-arm64-shared-lib/lib/libsherpa-onnx-c-api.dylib "$tmp"/sherpa-onnx-v1.13.8-osx-arm64-shared-lib/lib/libonnxruntime.dylib "$tmp/out/lib/"
+  cp "$tmp/$ENGINE_NAME/lib/libsherpa-onnx-c-api.dylib" "$tmp/$ENGINE_NAME/lib/libonnxruntime.dylib" "$tmp/out/lib/"
   tar -xjf "$tmp/voices.tar.bz2" -C "$tmp" kokoro-multi-lang-v1_0/model.onnx kokoro-multi-lang-v1_0/voices.bin kokoro-multi-lang-v1_0/tokens.txt kokoro-multi-lang-v1_0/LICENSE kokoro-multi-lang-v1_0/espeak-ng-data </dev/null
   mv "$tmp"/kokoro-multi-lang-v1_0/* "$tmp/out/kokoro/"
+  tar -xjf "$tmp/kws.tar.bz2" -C "$tmp" </dev/null
+  cp "$tmp/$KWS_DIR/encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx" "$tmp/out/kws/encoder.int8.onnx"
+  cp "$tmp/$KWS_DIR/decoder-epoch-12-avg-2-chunk-16-left-64.onnx" "$tmp/out/kws/decoder.onnx"
+  cp "$tmp/$KWS_DIR/joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx" "$tmp/out/kws/joiner.int8.onnx"
+  cp "$tmp/$KWS_DIR/tokens.txt" "$tmp/$KWS_DIR/bpe.model" "$tmp/out/kws/"
   echo "$VOICES_VERSION" > "$tmp/out/version"
   mkdir -p "$(dirname "$dest")"
   rm -rf "$dest"

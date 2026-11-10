@@ -6,7 +6,7 @@ Everything runs on your Mac. The model is a local open model through Ollama. Spe
 
 ## Install
 
-You need a Mac on macOS 13 or later. Apple silicon is recommended; 16 GB of memory runs the default model comfortably.
+You need a Mac on macOS 13 or later, Apple silicon or Intel (the app is universal). 16 GB of memory runs the default model comfortably; Apple silicon answers faster.
 
 ### Option 1: one line in Terminal
 
@@ -14,7 +14,7 @@ You need a Mac on macOS 13 or later. Apple silicon is recommended; 16 GB of memo
 curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/install.sh | bash
 ```
 
-The script does, in order: uses Ollama if you already have it, or downloads the official Ollama app from ollama.com and starts it (no Homebrew, no password), pulls a model sized to your Mac's memory (about 5 GB for 16 GB Macs, 9 GB for 32 GB), downloads her voices once (about 360 MB, checked against pinned SHA-256 sums, kept in `~/Library/Application Support/Sofia/Voices`), downloads the latest Sofia release, checks its SHA-256 against the published checksum, puts `Sofia.app` in `/Applications` (or `~/Applications` if you are not an administrator), and opens it. Read the script first if you like: it is short and plain bash. The ready-made app is for Apple silicon; on an Intel Mac, build from source (option 3).
+The script does, in order: uses Ollama if you already have it, or downloads the official Ollama app from ollama.com and starts it (no Homebrew, no password), pulls a model sized to your Mac's memory (about 5 GB for 16 GB Macs, 9 GB for 32 GB), downloads her voices and the wake-word model once (about 380 MB, checked against pinned SHA-256 sums, kept in `~/Library/Application Support/Sofia/Voices`), downloads the latest Sofia release, checks its SHA-256 against the published checksum, puts `Sofia.app` in `/Applications` (or `~/Applications` if you are not an administrator), and opens it. Read the script first if you like: it is short and plain bash.
 
 Pick a different model with `SOFIA_MODEL=qwen3:14b` in front of the command. Remove everything later with:
 
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/insta
 1. Install Ollama from [ollama.com](https://ollama.com) or `brew install ollama`, start it, and run `ollama pull qwen3:8b`.
 2. Download `Sofia.zip` from the [latest release](https://github.com/Sanjailenin/Jarvis-Sofia/releases/latest), unzip it, and move `Sofia.app` to Applications.
 3. The app is not notarized yet, so the first time right-click it, choose Open, and confirm.
-4. Add her voices (about 360 MB, once); until then she uses the Mac's own voice:
+4. Add her voices and the wake-word model (about 380 MB, once); until then she uses the Mac's own voice and Apple's speech recognition only:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/install.sh | bash -s -- --voices
@@ -45,7 +45,7 @@ Needs the Xcode Command Line Tools (`xcode-select --install`), nothing else.
 
 ### First run
 
-A welcome window asks two things: **her name** (the default is Sofia; whatever you choose becomes the wake phrase, "Hey <name>") and **her voice**: Heart, Kore, Sarah or Aoede (women), Puck or Fenrir (men), with a Preview button. These six scored best of 32 voices tested for naturalness and clarity. Both can be changed later in Settings. Then macOS asks for permissions as they are needed:
+A welcome window asks two things: **her name** (the default is Sofia; whatever you choose becomes the wake phrase, "Hey <name>") and **her voice**: Heart, Kore, Sarah or Aoede (women), Puck or Fenrir (men), with a Preview button. These six scored best of 32 voices tested for naturalness and clarity. Both can be changed later in Settings. The same window lists every permission she uses, each with an Allow button, and an **Allow everything** button that asks macOS for them one after another; Accessibility and Screen Recording open System Settings, where you switch Sofia on. Anything you skip can be allowed later in Settings → Permissions, which also has a Reset button for an entry left over from an older version.
 
 | Permission | Why | Needed for |
 |---|---|---|
@@ -54,7 +54,7 @@ A welcome window asks two things: **her name** (the default is Sofia; whatever y
 | Accessibility | moving windows, pressing controls, typing | Mac control, dictation |
 | Screen Recording | screenshots | the `screen` command from your phone, screen tasks |
 | Calendars | today's events | staying quiet during meetings, the battery nudge before one |
-| Automation (Spotify, Music, System Events) | music control, dark mode, typing | asked the first time each is used |
+| Automation (System Events, and Spotify or Music the first time each is used) | music control, dark mode, typing | Mac control |
 
 Say "Hey <her name>" or press ⌃⌥S and ask for something. If she says the model is not reachable, run `ollama serve` in Terminal or check the model name in Settings.
 
@@ -63,6 +63,8 @@ Say "Hey <her name>" or press ⌃⌥S and ask for something. If she says the mod
 - "Hey <her name>, …" or ⌃⌥S to talk. Esc cancels. She keeps listening for a follow-up after answering; "thanks" or "that's all" closes.
 - ⌃⌥D dictates: speak, and she types it where your cursor is. Press again to stop early.
 - "<Her name>, go off" puts her to sleep, any time, no "Hey" needed. "Turn off", "shut down", "go to sleep" and "good night" work too. "Hey <her name>", a double clap, the hotkey or the menu bar item wake her.
+- Two listeners hear "Hey <her name>": Apple's on-device speech recognition, and a small keyword spotter ([sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), a 3 MB streaming Zipformer) that listens for the sound of the phrase instead of reading a transcript, so a name the recogniser writes wrong still wakes her. Whichever hears it first wins. It works for any name made of letters; on test voices it caught about 70% of wakes (Max 89%, Nova 79%, Sofia and Luna 75%, Jarvis 71%, Maya 67%) and fired on nothing in 14 minutes of other speech. It can be switched off in Settings.
+- A double clap is checked by macOS's built-in sound classifier before it counts: two bangs that sound like a knock, a door, a finger snap, typing or a glass are ignored, and the events log says so. Close calls still count.
 - While the Mac plays any audio (music, a video, a call), claps and the entrance phrase are ignored and only "Hey <her name>" wakes her. Claps are also ignored while you type or click and while the screen is locked.
 - The island follows your pointer across displays; on a screen without a notch it is a pill under the menu bar.
 - Nudges: low battery (earlier when a meeting is coming), disk nearly full, network lost and back.
@@ -92,7 +94,7 @@ These commands never touch a model:
 | `stop remote` / `start remote` | remote access off and on |
 | `help` | this list |
 
-Anything else goes to the model. By default that is the same local Ollama model. In Settings you can point free-form messages from the phone at OpenAI or Anthropic with your own key, while everything said at the Mac stays local.
+Anything else goes to the model. By default that is the same local Ollama model. In Settings you can point free-form messages from the phone at OpenAI with your own key, while everything said at the Mac stays local.
 
 Files leave the Mac only from the folders you allow (Desktop, Documents, Downloads, Movies, Pictures and Music by default). Hidden files, Library, SSH keys, keychains, env files and anything that looks like a key are refused, as is anything over 100 MB. A closed lid still sleeps the Mac unless a display is attached; "Keep this Mac awake while plugged in" holds it awake on mains power.
 
@@ -111,4 +113,4 @@ See [PRIVACY.md](PRIVACY.md) and [SECURITY.md](SECURITY.md). In short: local mod
 
 ## License
 
-MIT.
+MIT. Downloaded at install time, under their own Apache-2.0 licences: [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), the Kokoro voices and the kws-zipformer-gigaspeech-3.3M keyword model. The tests include that keyword model's token list.

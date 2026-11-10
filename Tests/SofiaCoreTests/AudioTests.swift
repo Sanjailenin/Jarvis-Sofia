@@ -19,7 +19,7 @@ import Foundation
         #expect(String(decoding: d[0..<4], as: UTF8.self) == "RIFF")
         #expect(String(decoding: d[8..<12], as: UTF8.self) == "WAVE")
         #expect(d.count == 44 + 6)
-        #expect(d.subdata(in: 24..<28) == Data([0x80, 0x3E, 0, 0])) // 16000 Hz
+        #expect(d.subdata(in: 24..<28) == Data([0x80, 0x3E, 0, 0]))
     }
 
     @Test func endpointerFinishesAfterSilenceFollowingSpeech() {
@@ -65,11 +65,11 @@ import Foundation
     @Test func casualFormNeedsHerNameAndARequest() {
         for t in ["Sofia, what's on today", "sofia open spotify", "so fia what time is it", "right so Sofia, play some music"] {
             #expect(WakeWord.matches(t, casual: true), Comment(rawValue: t))
-            #expect(!WakeWord.matches(t), Comment(rawValue: t))                      // never without the warm window
+            #expect(!WakeWord.matches(t), Comment(rawValue: t))
         }
         for t in ["Sofia", "Sofia,", "I met Sofia", "that was Sofia.", "sofiatown is nice"] { #expect(!WakeWord.matches(t, casual: true), Comment(rawValue: t)) }
         #expect(WakeWord.remainder("Sofia, what's on today", casual: true) == "what's on today")
-        #expect(WakeWord.remainder("Hey Sofia what's on", casual: true) == "what's on")   // the full form still wins
+        #expect(WakeWord.remainder("Hey Sofia what's on", casual: true) == "what's on")
         #expect(WakeWord.remainder("Sofia", casual: true) == "")
     }
 }
@@ -77,8 +77,8 @@ import Foundation
 @Suite struct LevelTests {
     @Test func quietSpeechStillCountsAsSpeech() {
         var e = Endpointer(); var r = Endpointer.Decision.keepGoing
-        for _ in 0..<10 { r = e.feed(rms: 0.0003, dt: 0.1) }          // quiet room, like this MacBook
-        for _ in 0..<5 { r = e.feed(rms: 0.008, dt: 0.1) }            // normal speech on this mic
+        for _ in 0..<10 { r = e.feed(rms: 0.0003, dt: 0.1) }
+        for _ in 0..<5 { r = e.feed(rms: 0.008, dt: 0.1) }
         #expect(e.hasHeardSpeech)
         for _ in 0..<17 { r = e.feed(rms: 0.0003, dt: 0.1) }
         #expect(r == .finished)

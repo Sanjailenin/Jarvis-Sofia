@@ -84,6 +84,36 @@ struct FalseWakeTests {
         #expect(feed(&e, music + clap(level: 14000) + noise(ms: 300) + clap(level: 14000) + noise(ms: 600)) <= 1, "only the music's first two beats, not the claps among the beats")
     }
 
+    @Test func aLoudClapThatRingsStillCounts() {
+        var d = ClapDetector()
+        let ringing = hit(peak: 32767, decayMs: 90, ms: 260)
+        #expect(feed(&d, noise(ms: 2600) + ringing + noise(ms: 200) + ringing + noise(ms: 600)) == 1)
+    }
+
+    @Test func unhurriedClapsStillPair() {
+        var d = ClapDetector()
+        #expect(feed(&d, noise(ms: 2600) + clap() + noise(ms: 910) + clap() + noise(ms: 600)) == 1, "about 0.95 s apart")
+        var e = ClapDetector()
+        #expect(feed(&e, noise(ms: 2600) + clap() + noise(ms: 1400) + clap() + noise(ms: 600)) == 0, "1.4 s apart is two single claps")
+    }
+
+    @Test func aLoudSyllableIsStillNotAClap() {
+        var d = ClapDetector()
+        let syllable: [Int16] = (0..<(16 * 300)).map { _ in random(-30000...30000) }
+        #expect(feed(&d, noise(ms: 2600) + syllable + noise(ms: 250) + syllable + noise(ms: 600)) == 0)
+    }
+
+    @Test func aDoubleClapReportsHowLoudItWas() {
+        var d = ClapDetector()
+        #expect(d.lastPair == nil)
+        #expect(feed(&d, noise(ms: 2600) + clap(level: 12000) + noise(ms: 300) + clap(level: 12000) + noise(ms: 600)) == 1)
+        let pair = d.lastPair
+        #expect(pair != nil)
+        #expect((pair?.first ?? 0) > 6000 && (pair?.first ?? 0) <= 12000 && (pair?.second ?? 0) > 6000)
+        #expect((pair?.gap ?? 0) > 0.25 && (pair?.gap ?? 0) < 0.45)
+        #expect(pair?.describe(sensitivity: .normal) == "peaks \(Int(pair!.first)) and \(Int(pair!.second)) of 32767, \(String(format: "%.2f", pair!.gap)) s apart, sensitivity normal (needs \(4500))")
+    }
+
     @Test func clapGateReasons() {
         #expect(ClapGate.block(locked: false, secondsSinceKey: 60, secondsSinceClick: 60, macPlaying: false, videoInFront: false) == nil)
         #expect(ClapGate.block(locked: true, secondsSinceKey: 60, secondsSinceClick: 60, macPlaying: false, videoInFront: false) == "screen locked")

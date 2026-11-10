@@ -16,4 +16,4 @@ Open a private security advisory on the repository, or email the maintainers lis
 
 ## Out of scope
 
-Behaviour of Ollama, Telegram, ElevenLabs, OpenAI or Anthropic themselves; a Mac that is already compromised; a user granting the paired chat to someone else.
+Behaviour of Ollama, Telegram, ElevenLabs or OpenAI themselves; a Mac that is already compromised; a user granting the paired chat to someone else.

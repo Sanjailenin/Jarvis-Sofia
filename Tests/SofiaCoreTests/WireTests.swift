@@ -21,16 +21,6 @@ struct WireTests {
         #expect((body["tools"] as? [[String: Any]])?.count == Prompt.tools.count)
         #expect(body["model"] as? String == "qwen3:8b")
     }
-    @Test func anthropicBodyAndReply() {
-        let body = AnthropicWire.body(model: "m", messages: [.system("sys"), .user("hi"), .assistant("", calls: [ToolCall(id: "t1", name: "mac_control", arguments: #"{"action":"mute"}"#)]), .tool("t1", "Done.")], tools: Prompt.tools)
-        #expect(body["system"] as? String == "sys")
-        let msgs = body["messages"] as! [[String: Any]]
-        #expect(msgs.count == 3 && msgs[2]["role"] as? String == "user")
-        let blocks = msgs[1]["content"] as! [[String: Any]]
-        #expect(blocks[0]["type"] as? String == "tool_use" && (blocks[0]["input"] as? [String: Any])?["action"] as? String == "mute")
-        let r = AnthropicWire.reply(from: json(#"{"content":[{"type":"text","text":"Sure."},{"type":"tool_use","id":"t2","name":"mac_control","input":{"action":"lock_screen"}}]}"#))!
-        #expect(r.text == "Sure." && r.calls[0].input["action"] as? String == "lock_screen")
-    }
     @Test func telegramUpdatesAndPairing() {
         let list = TelegramUpdate.list(from: json(#"{"ok":true,"result":[{"update_id":7,"message":{"chat":{"id":42},"from":{"first_name":"Sam"},"text":" send me the thesis "}},{"update_id":8,"message":{"chat":{"id":42},"photo":[]}},{"update_id":9,"edited_message":{}}]}"#))
         #expect(list.count == 2 && list[0] == TelegramUpdate(updateID: 7, chatID: 42, text: "send me the thesis", senderName: "Sam") && list[1].text == "")

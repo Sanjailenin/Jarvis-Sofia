@@ -47,6 +47,8 @@ final class Controller {
         settings.$conversation.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.machine.conversation = on } }.store(in: &bag)
         settings.$wakeWord.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.applyWake(on) } }.store(in: &bag)
         settings.$clapSensitivity.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] s in MainActor.assumeIsolated { self?.wake.clapSensitivity = ClapDetector.Sensitivity(rawValue: s) ?? .normal } }.store(in: &bag)
+        settings.$keywordWake.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.wake.keywordWakeOn = on } }.store(in: &bag)
+        settings.$clapVerify.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.wake.clapVerifyOn = on } }.store(in: &bag)
         settings.$entrance.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.wake.entranceOn = on } }.store(in: &bag)
         settings.$nudges.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { guard let self else { return }; on && !self.settings.standby ? self.nudges.start() : self.nudges.stop() } }.store(in: &bag)
         settings.$keepAwake.removeDuplicates().receive(on: DispatchQueue.main).sink { [weak self] on in MainActor.assumeIsolated { self?.keepAwake.enabled = on } }.store(in: &bag)

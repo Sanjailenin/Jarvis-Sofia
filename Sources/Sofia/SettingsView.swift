@@ -13,6 +13,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("Permissions") { PermissionsView() }
             Section("You and her") {
                 TextField("Her name (what you call her: “Hey …”)", text: $settings.assistantName).textFieldStyle(.roundedBorder)
                 TextField("Your first name (how she addresses you)", text: $settings.ownerName).textFieldStyle(.roundedBorder)
@@ -25,7 +26,6 @@ struct SettingsView: View {
                 TextField("Vision model for screen tasks, with vision and tools (e.g. qwen3-vl:8b)", text: $settings.visionModel).textFieldStyle(.roundedBorder)
                 Toggle("Let the model think before answering (slower, more careful)", isOn: $settings.thinking)
                 Toggle("Let her use the screen, mouse and keyboard for multi-step tasks", isOn: $settings.allowComputer)
-                if settings.allowComputer { ScreenAccessRow() }
                 HStack {
                     Text(fields.ollamaState.isEmpty ? "Everything you say to the notch is answered here, on this Mac." : fields.ollamaState).font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -57,6 +57,10 @@ struct SettingsView: View {
                     }.padding(.vertical, 4)
                 }
                 Toggle("Just “\(settings.assistantName), …” for 10 minutes after a conversation", isOn: $settings.casualWake).disabled(!settings.wakeWord)
+                Toggle("Also hear “Hey \(settings.assistantName)” with the keyword spotter", isOn: $settings.keywordWake).disabled(!settings.wakeWord)
+                Text(KeywordSpotter.installed
+                     ? "A small model on this Mac listens for the sound of “Hey \(settings.assistantName)” next to Apple's speech recognition, which often writes the name wrong. Whichever hears it first wakes her. It needs a restart after changing her name."
+                     : "Not installed yet. Run the installer again to add it: \(Speech.installCommand)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 Toggle("Keep listening after she answers", isOn: $settings.conversation)
                 Toggle("Noise suppression and echo cancellation", isOn: $settings.cleanAudio)
                 Text("Cleans your voice while you speak a request; other audio is turned down only for those few seconds. While the Mac plays any audio, claps and the entrance phrase are ignored and only “Hey \(settings.assistantName)” wakes her.").font(.caption).foregroundStyle(.secondary)
@@ -68,6 +72,8 @@ struct SettingsView: View {
             Section("Entrance") {
                 Toggle("Play a song on a double clap or “wake up, daddy's home”", isOn: $settings.entrance)
                 Picker("Clap sensitivity", selection: $settings.clapSensitivity) { Text("Low").tag("low"); Text("Normal").tag("normal"); Text("High").tag("high") }.pickerStyle(.segmented).disabled(!settings.entrance)
+                Toggle("Check claps with Apple's sound classifier", isOn: $settings.clapVerify).disabled(!settings.entrance)
+                Text("Two sharp sounds are checked by macOS's built-in classifier before they count: a knock, a door, a finger snap, typing or a glass with a clear lead over clapping is ignored; anything close still counts.").font(.caption).foregroundStyle(.secondary)
                 TextField("Spotify track link (optional)", text: $settings.entranceSpotify).textFieldStyle(.roundedBorder).disabled(!settings.entrance)
                 HStack {
                     TextField("Or your own mp3/wav path", text: $settings.entranceFile).textFieldStyle(.roundedBorder).disabled(!settings.entrance)
@@ -88,9 +94,8 @@ struct SettingsView: View {
                 }
                 TextField("Folders files may be sent from (comma-separated; empty = Desktop, Documents, Downloads, Movies, Pictures, Music)", text: $settings.remoteRoots).textFieldStyle(.roundedBorder)
                 Toggle("Keep this Mac awake while plugged in", isOn: $settings.keepAwake)
-                Picker("Model for free-form requests from the phone", selection: $settings.phoneProvider) { Text("Ollama (local)").tag("ollama"); Text("OpenAI").tag("openai"); Text("Anthropic").tag("anthropic") }
+                Picker("Model for free-form requests from the phone", selection: $settings.phoneProvider) { Text("Ollama (local)").tag("ollama"); Text("OpenAI").tag("openai") }
                 if settings.phoneProvider == "openai" { HStack { SecureField("OpenAI API key", text: $fields.openAIKey); Button("Save") { save(settings.openAIKey, fields.openAIKey) } } }
-                if settings.phoneProvider == "anthropic" { HStack { SecureField("Anthropic API key", text: $fields.anthropicKey); Button("Save") { save(settings.anthropicKey, fields.anthropicKey) } } }
                 if settings.phoneProvider != "ollama" { TextField("Model name (optional)", text: $settings.phoneModel).textFieldStyle(.roundedBorder) }
                 Text("Commands like “send me the thesis pdf”, “screen”, “status”, “lock” never use a model. Only free-form messages do, and only from the phone. Keys live in your Keychain.").font(.caption).foregroundStyle(.secondary)
             }
@@ -101,7 +106,6 @@ struct SettingsView: View {
             fields.telegramToken = settings.telegramToken.read() ?? ""
             fields.elevenLabsKey = settings.elevenLabsKey.read() ?? ""
             fields.openAIKey = settings.openAIKey.read() ?? ""
-            fields.anthropicKey = settings.anthropicKey.read() ?? ""
         }
     }
 
@@ -115,7 +119,6 @@ final class SecretFields: ObservableObject {
     @Published var telegramToken = ""
     @Published var elevenLabsKey = ""
     @Published var openAIKey = ""
-    @Published var anthropicKey = ""
     @Published var ollamaState = ""
 }
 
@@ -158,57 +161,3 @@ struct WakeHelp {
     }
 }
 
-@MainActor
-final class ScreenAccess: ObservableObject {
-    @Published var screen = ScreenCapture.hasPermission
-    @Published var input = InputDriver.hasPermission
-    private var timer: Timer?
-    init() {
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                let s = ScreenCapture.hasPermission, i = InputDriver.hasPermission
-                if s != self.screen { self.screen = s }
-                if i != self.input { self.input = i }
-            }
-        }
-    }
-    deinit { timer?.invalidate() }
-}
-
-struct ScreenAccessRow: View {
-    @StateObject private var access = ScreenAccess()
-    private var screen: Bool { access.screen }
-    private var input: Bool { access.input }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            row("Screen Recording", on: screen, pane: "Privacy_ScreenCapture") { ScreenCapture.requestPermission() }
-            row("Accessibility", on: input, pane: "Privacy_Accessibility") { InputDriver.requestPermission() }
-            if !screen || !input {
-                Button("Reset Sofia's screen permissions and ask again") {
-                    for service in ["Accessibility", "ScreenCapture"] {
-                        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil"); p.arguments = ["reset", service, Bundle.main.bundleIdentifier ?? "dev.sofia.app"]
-                        try? p.run(); p.waitUntilExit()
-                    }
-                    InputDriver.requestPermission(); ScreenCapture.requestPermission()
-                }
-                Text("Screen tasks need both. Click Allow and turn Sofia on in the list that opens. If Sofia is already on there but this still says not allowed, the entry is from an older version: click Reset above, allow both again when macOS asks, then quit and reopen Sofia. Screen tasks need “Screen & System Audio Recording”, not “System Audio Recording Only”.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func row(_ name: String, on: Bool, pane: String, request: @escaping () -> Void) -> some View {
-        HStack {
-            Image(systemName: on ? "checkmark.circle.fill" : "exclamationmark.circle").foregroundStyle(on ? .green : .orange)
-            Text("\(name): \(on ? "allowed" : "not allowed")").font(.caption)
-            Spacer()
-            if !on {
-                Button("Allow") {
-                    request()
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(url) }
-                }
-            }
-        }
-    }
-}

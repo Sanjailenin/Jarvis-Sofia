@@ -91,52 +91,6 @@ public enum OpenAIWire {
     }
 }
 
-public enum AnthropicWire {
-    public static func body(model: String, messages: [ChatMessage], tools: [ToolSpec], maxTokens: Int = 1200) -> [String: Any] {
-        let system = messages.filter { $0.role == .system }.map(\.content).joined(separator: "\n\n")
-        var out: [String: Any] = ["model": model, "max_tokens": maxTokens, "messages": encode(messages.filter { $0.role != .system })]
-        if !system.isEmpty { out["system"] = system }
-        if !tools.isEmpty { out["tools"] = tools.map { ["name": $0.name, "description": $0.description, "input_schema": $0.parameters] } }
-        return out
-    }
-    static func encode(_ messages: [ChatMessage]) -> [[String: Any]] {
-        var out: [[String: Any]] = []
-        var pendingResults: [[String: Any]] = []
-        func flushResults() { if !pendingResults.isEmpty { out.append(["role": "user", "content": pendingResults]); pendingResults = [] } }
-        for m in messages {
-            switch m.role {
-            case .tool:
-                let blocks: [[String: Any]] = [["type": "text", "text": m.content]] + m.images.map { ["type": "image", "source": ["type": "base64", "media_type": "image/jpeg", "data": $0]] }
-                pendingResults.append(["type": "tool_result", "tool_use_id": m.toolCallID ?? "", "content": blocks])
-            case .assistant:
-                flushResults()
-                var blocks: [[String: Any]] = []
-                if !m.content.isEmpty { blocks.append(["type": "text", "text": m.content]) }
-                for c in m.toolCalls { blocks.append(["type": "tool_use", "id": c.id, "name": c.name, "input": c.input]) }
-                out.append(["role": "assistant", "content": blocks.isEmpty ? [["type": "text", "text": "…"]] : blocks])
-            case .user:
-                flushResults()
-                if m.images.isEmpty { out.append(["role": "user", "content": m.content]) }
-                else { out.append(["role": "user", "content": [["type": "text", "text": m.content]] + m.images.map { ["type": "image", "source": ["type": "base64", "media_type": "image/jpeg", "data": $0]] }]) }
-            case .system: break
-            }
-        }
-        flushResults()
-        return out
-    }
-    public static func reply(from json: [String: Any]) -> ChatReply? {
-        guard let blocks = json["content"] as? [[String: Any]] else { return nil }
-        let text = blocks.filter { $0["type"] as? String == "text" }.compactMap { $0["text"] as? String }.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
-        let calls = blocks.filter { $0["type"] as? String == "tool_use" }.compactMap { b -> ToolCall? in
-            guard let name = b["name"] as? String else { return nil }
-            let input = b["input"] ?? [:]
-            let args = (try? JSONSerialization.data(withJSONObject: input)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
-            return ToolCall(id: b["id"] as? String ?? UUID().uuidString, name: name, arguments: args)
-        }
-        return ChatReply(text: text, calls: calls)
-    }
-}
-
 public enum OllamaWire {
     public static func body(model: String, messages: [ChatMessage], tools: [ToolSpec], stream: Bool, think: Bool) -> [String: Any] {
         let images = messages.contains { !$0.images.isEmpty }

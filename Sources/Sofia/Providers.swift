@@ -98,23 +98,3 @@ struct OpenAICompatibleProvider: ModelProvider {
     }
 }
 
-struct AnthropicProvider: ModelProvider {
-    let apiKey: String
-    let model: String
-    var label: String { "Anthropic \(model)" }
-    var supportsVision: Bool { true }
-
-    func chat(_ messages: [ChatMessage], tools: [ToolSpec]) async throws -> ChatReply {
-        var r = URLRequest(url: URL(string: "https://api.anthropic.com/v1/messages")!, timeoutInterval: 120)
-        r.httpMethod = "POST"
-        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        r.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        r.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        r.httpBody = try JSONSerialization.data(withJSONObject: AnthropicWire.body(model: model, messages: messages, tools: tools))
-        let (data, resp) = try await URLSession.shared.data(for: r)
-        guard let http = resp as? HTTPURLResponse else { throw ProviderError("no response from Anthropic") }
-        guard (200..<300).contains(http.statusCode) else { throw ProviderError("Anthropic answered \(http.statusCode)") }
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any], let reply = AnthropicWire.reply(from: json) else { throw ProviderError("Anthropic sent something unexpected") }
-        return reply
-    }
-}

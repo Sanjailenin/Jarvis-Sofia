@@ -21,6 +21,8 @@ final class AppSettings: ObservableObject {
     @Published var wakeWord: Bool { didSet { d.set(wakeWord, forKey: "wakeWord") } }
     @Published var wakeMessage = ""
     @Published var casualWake: Bool { didSet { d.set(casualWake, forKey: "casualWake") } }
+    @Published var keywordWake: Bool { didSet { d.set(keywordWake, forKey: "keywordWake") } }
+    @Published var clapVerify: Bool { didSet { d.set(clapVerify, forKey: "clapVerify") } }
     static let casualWindow: TimeInterval = 10 * 60
     @Published var conversation: Bool { didSet { d.set(conversation, forKey: "conversation") } }
     @Published var cleanAudio: Bool { didSet { d.set(cleanAudio, forKey: "cleanAudio") } }
@@ -49,7 +51,6 @@ final class AppSettings: ObservableObject {
     let telegramToken: SecretStore = CachedSecretStore(KeychainSecretStore(service: "dev.sofia.app", account: "telegram-token"))
     let elevenLabsKey: SecretStore = CachedSecretStore(KeychainSecretStore(service: "dev.sofia.app", account: "elevenlabs-key"))
     let openAIKey: SecretStore = CachedSecretStore(KeychainSecretStore(service: "dev.sofia.app", account: "openai-key"))
-    let anthropicKey: SecretStore = CachedSecretStore(KeychainSecretStore(service: "dev.sofia.app", account: "anthropic-key"))
 
     init() {
         let d = UserDefaults.standard
@@ -70,6 +71,8 @@ final class AppSettings: ObservableObject {
         elevenLabsVoice = d.string(forKey: "elevenLabsVoice") ?? ""
         wakeWord = flag("wakeWord", true)
         casualWake = flag("casualWake", true)
+        keywordWake = flag("keywordWake", true)
+        clapVerify = flag("clapVerify", true)
         conversation = flag("conversation", true)
         cleanAudio = flag("cleanAudio", true)
         entrance = flag("entrance", false)
@@ -93,8 +96,6 @@ final class AppSettings: ObservableObject {
         switch phoneProvider {
         case "openai":
             if let key = openAIKey.read(), !key.isEmpty { return OpenAICompatibleProvider(baseURL: URL(string: "https://api.openai.com")!, apiKey: key, model: phoneModel.isEmpty ? "gpt-4o-mini" : phoneModel, label: "OpenAI") }
-        case "anthropic":
-            if let key = anthropicKey.read(), !key.isEmpty { return AnthropicProvider(apiKey: key, model: phoneModel.isEmpty ? "claude-haiku-5-5" : phoneModel) }
         default: break
         }
         return OllamaProvider(url: ollamaURL, model: ollamaModel, think: true)

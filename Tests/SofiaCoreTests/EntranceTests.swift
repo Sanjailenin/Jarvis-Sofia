@@ -37,10 +37,10 @@ struct EntranceTests {
         while start < s.count { let end = min(start + sizes[k % sizes.count], s.count); if det.feed(Array(s[start..<end])) { fired += 1 }; start = end; k += 1 }
         return fired
     }
-    private let warm = 2400   // ms of room noise before anything counts
+    private let warm = 2400
 
     @Test func startupBumpsDoNotFire() {
-        var d = ClapDetector()   // two bumps as the audio engine starts, inside the warm-up
+        var d = ClapDetector()
         #expect(feed(&d, noise(ms: 300) + clap() + noise(ms: 260) + clap() + noise(ms: 1400)) == 0)
     }
     @Test func doubleClapFires() {
@@ -48,7 +48,7 @@ struct EntranceTests {
         #expect(feed(&d, noise(ms: warm) + clap() + noise(ms: 260) + clap() + noise(ms: 400)) == 1)
     }
     @Test func quietAndDistantClapsFire() {
-        var d = ClapDetector()   // across the room: a quarter of the level, with a reverb tail
+        var d = ClapDetector()
         #expect(feed(&d, noise(ms: warm) + clap(level: 6500, tail: 1200) + noise(ms: 300) + clap(level: 6500, tail: 1200) + noise(ms: 400)) == 1)
     }
     @Test func slowAndFastDoubleClapsFire() {
@@ -56,7 +56,7 @@ struct EntranceTests {
         #expect(feed(&d, noise(ms: warm) + clap() + noise(ms: 130) + clap() + noise(ms: 2000) + clap() + noise(ms: 700) + clap() + noise(ms: 400)) == 2)
     }
     @Test func clapsOverBackgroundNoiseFire() {
-        var d = ClapDetector()   // fan or quiet music in the room
+        var d = ClapDetector()
         #expect(feed(&d, noise(ms: warm, level: 1200) + clap(level: 14000) + noise(ms: 250, level: 1200) + clap(level: 14000) + noise(ms: 400, level: 1200)) == 1)
     }
     @Test func singleClapDoesNot() {
@@ -68,33 +68,33 @@ struct EntranceTests {
         #expect(feed(&d, noise(ms: warm) + clap() + noise(ms: 1000) + clap() + noise(ms: 400)) == 0)
     }
     @Test func clapsTooCloseDoNot() {
-        var d = ClapDetector()   // one clap with a bounce, 60 ms apart
+        var d = ClapDetector()
         #expect(feed(&d, noise(ms: warm) + clap() + noise(ms: 20) + clap() + noise(ms: 600)) == 0)
     }
     @Test func steadyLoudSoundDoesNot() {
-        var d = ClapDetector()   // loud music: nothing dies away
+        var d = ClapDetector()
         #expect(feed(&d, noise(ms: warm) + noise(ms: 1500, level: 20000)) == 0)
     }
     @Test func speechDoesNot() {
-        var d = ClapDetector()   // two loud syllables 300 ms apart hold their level instead of decaying
+        var d = ClapDetector()
         #expect(feed(&d, noise(ms: warm) + syllable() + noise(ms: 180) + syllable() + noise(ms: 600)) == 0)
     }
     @Test func typingDoesNot() {
-        var d = ClapDetector()   // quiet ticks, 200 ms apart, far below a clap
+        var d = ClapDetector()
         var a = noise(ms: warm)
         for _ in 0..<6 { a += clap(level: 1500) + noise(ms: 160) }
         #expect(feed(&d, a) == 0)
     }
     @Test func aFilmPlayingInTheRoomDoesNot() {
-        var d = ClapDetector()   // loud soundtrack (ambient well above a quiet room) with two sharp hits in it
+        var d = ClapDetector()
         #expect(feed(&d, noise(ms: warm, level: 3000) + clap(level: 24000) + noise(ms: 300, level: 3000) + clap(level: 24000) + noise(ms: 400, level: 3000)) == 0)
     }
     @Test func twoVeryDifferentHitsDoNot() {
-        var d = ClapDetector()   // a door slam and a small tap: not a pair of hands
+        var d = ClapDetector()
         #expect(feed(&d, noise(ms: warm) + clap(level: 28000) + noise(ms: 300) + clap(level: 5000) + noise(ms: 400)) == 0)
     }
     @Test func noDipBetweenDoesNot() {
-        var d = ClapDetector()   // the sound stays loud between the two onsets (a sustained note with two attacks)
+        var d = ClapDetector()
         #expect(feed(&d, noise(ms: warm) + clap() + noise(ms: 300, level: 12000) + clap() + noise(ms: 400)) == 0)
     }
     @Test func thirdClapAfterFiringNeedsAFreshPair() {

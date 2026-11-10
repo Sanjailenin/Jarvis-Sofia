@@ -7,7 +7,7 @@ public struct MacAction: Equatable {
         case typeText = "type_text"
         case webSearch = "web_search", findFile = "find_file", playMusic = "play_music", playVideo = "play_video", playResult = "play_result", openSettings = "open_settings"
         case clipboardCopy = "clipboard_copy", newNote = "new_note"
-        case openDeeplink = "open_deeplink"      // an app link (spotify:, slack://…) from the fixed scheme list
+        case openDeeplink = "open_deeplink"
         case moveWindow = "move_window"
         case setPreference = "set_preference"
         case focus, hideApp = "hide_app", unhideApp = "unhide_app"

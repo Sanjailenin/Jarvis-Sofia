@@ -7,6 +7,7 @@ struct SetupView: View {
     @ObservedObject private var state = SetupState()
 
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 18) {
             Text("Welcome").font(.largeTitle.bold())
             Text("Two choices before we start. You can change both later in Settings.").foregroundStyle(.secondary)
@@ -32,6 +33,13 @@ struct SetupView: View {
                 }.padding(6)
             }
 
+            GroupBox("Permissions") {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("macOS asks once for each. Click Allow everything and answer each prompt; Accessibility and Screen Recording open System Settings, where you switch Sofia on.").font(.caption).foregroundStyle(.secondary)
+                    PermissionsView()
+                }.padding(6)
+            }
+
             GroupBox("The model") {
                 HStack {
                     Text(state.ollama.isEmpty ? "She thinks with Ollama on this Mac (\(settings.ollamaModel))." : state.ollama).font(.caption)
@@ -42,13 +50,14 @@ struct SetupView: View {
 
             Spacer()
             HStack {
-                Text("Next, macOS will ask for the microphone and speech recognition. Allow both for voice to work.").font(.caption).foregroundStyle(.secondary)
+                Text("You can allow anything you skip later in Settings → Permissions.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Continue") { if settings.assistantName.trimmingCharacters(in: .whitespaces).isEmpty { settings.assistantName = WakeWord.defaultName }; done() }.keyboardShortcut(.defaultAction)
             }
         }
         .padding(24)
-        .frame(minWidth: 540, minHeight: 600)
+        }
+        .frame(minWidth: 580, minHeight: 640)
         .onAppear { if settings.assistantName.isEmpty { settings.assistantName = WakeWord.defaultName } }
     }
 }

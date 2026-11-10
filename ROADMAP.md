@@ -27,7 +27,7 @@ An honest review of the first public build, with the changes that would make it 
 
 - **Two targets, one direction.** `SofiaCore` is pure and tested; `Sofia` touches the system. Keep it that way: anything new that can be a pure function with a test belongs in core. The state machine, the clap detector, the file policy and the command parser are the model to copy.
 - **The controller** owns the voice loop; the phone channel lives in `PhoneChannel`. Standby could move out next.
-- **One provider protocol** covers Ollama, OpenAI-compatible servers and Anthropic, with streaming and a vision flag. Adding a provider is one struct.
+- **One provider protocol** covers Ollama and OpenAI-compatible servers (LM Studio, llama.cpp, OpenAI), with streaming and a vision flag. Adding a provider is one struct.
 - **Memory** is a JSON list of facts. It is deliberately simple and inspectable. If it grows, a small SQLite store with full-text search is the next step, not a vector database.
 
 ## Not yet

@@ -1,11 +1,16 @@
 #!/bin/zsh
 set -e -o pipefail
 cd "$(dirname "$0")/.."
-swift build -c release --build-system native 2>&1 | { grep -v "ld: warning" || true; } | tail -2
-BIN=$(swift build -c release --build-system native --show-bin-path 2>/dev/null)/Sofia
+ARCHS=(${=SOFIA_ARCHS:-arm64 x86_64})
+SLICES=()
+for arch in $ARCHS; do
+  swift build -c release --build-system native --triple "$arch-apple-macosx13.0" 2>&1 | { grep -v "ld: warning" || true; } | tail -1
+  SLICES+=("$(swift build -c release --build-system native --triple "$arch-apple-macosx13.0" --show-bin-path 2>/dev/null)/Sofia")
+done
 APP=build/Sofia.app
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS"
-cp "$BIN" "$APP/Contents/MacOS/Sofia"
+lipo -create -output "$APP/Contents/MacOS/Sofia" "${SLICES[@]}"
+lipo -info "$APP/Contents/MacOS/Sofia"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

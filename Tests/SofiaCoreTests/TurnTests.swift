@@ -157,9 +157,6 @@ struct SplitterAndOllamaTests {
         let m = ChatMessage(role: .user, content: "look", images: ["AAAA"])
         let o = OpenAIWire.body(model: "m", messages: [m], tools: [])["messages"] as! [[String: Any]]
         #expect((o[0]["content"] as? [[String: Any]])?.count == 2)
-        let a = AnthropicWire.body(model: "m", messages: [m, .assistant("", calls: [ToolCall(id: "t", name: "screenshot", arguments: "{}")]), .tool("t", "screen", images: ["BBBB"])], tools: [])["messages"] as! [[String: Any]]
-        let result = ((a[2]["content"] as? [[String: Any]])?.first?["content"] as? [[String: Any]])
-        #expect(result?.count == 2 && result?[1]["type"] as? String == "image")
         let ol = OllamaWire.body(model: "m", messages: [m], tools: [], stream: false, think: false)["messages"] as! [[String: Any]]
         #expect(ol[0]["images"] as? [String] == ["AAAA"])
     }
@@ -245,7 +242,7 @@ struct ActionValueTests {
     }
 
     @Test func searchResultsAreNotDescribed() async throws {
-        let provider = ScriptedProvider([ChatReply(text: "", calls: [ToolCall(id: "s", name: "web_search", arguments: #"{"target":"weather in Paris"}"#)]), ChatReply(text: "The results are on screen.")])
+        let provider = ScriptedProvider([ChatReply(text: "", calls: [ToolCall(id: "s", name: "web_search", arguments: #"{"target":"weather in Lisbon"}"#)]), ChatReply(text: "The results are on screen.")])
         _ = try await AssistantTurn(memory: FakeMemory(), performer: FakePerformer()).run("weather", channel: "mac", provider: provider, ownerName: "", allowComputer: false)
         #expect(provider.seen[1].last?.content.contains("you have not seen it") == true)
     }
@@ -303,7 +300,7 @@ struct WebsiteTests {
             ("open YouTube and search for lofi music", "lofi music", "youtube"),
             ("search YouTube for cooking videos", "cooking videos", "youtube"),
             ("look up the Eiffel Tower on Wikipedia", "the eiffel tower", "wikipedia"),
-            ("search Google for weather in Paris", "weather in paris", "google"),
+            ("search Google for weather in Lisbon", "weather in lisbon", "google"),
         ]
         for (text, query, site) in cases {
             let m = QuickCommand.match(text)
@@ -415,7 +412,6 @@ struct ContextSizeTests {
         #expect((shot["options"] as? [String: Any])?["num_ctx"] as? Int == 16384)
     }
 }
-
 
 struct OnScreenTests {
     @Test func nthResultOnThePage() {

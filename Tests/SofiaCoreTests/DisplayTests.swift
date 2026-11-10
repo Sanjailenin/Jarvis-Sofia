@@ -8,14 +8,14 @@ struct DisplayTests {
     @Test func followUsesTheScreenUnderTheMouse() {
         #expect(IslandPlacement.choose([laptop, external], mode: .follow, mouse: (2000, 800)) == external)
         #expect(IslandPlacement.choose([laptop, external], mode: .follow, mouse: (100, 100)) == laptop)
-        #expect(IslandPlacement.choose([laptop, external], mode: .follow, mouse: nil) == laptop)            // no pointer: the notch screen
-        #expect(IslandPlacement.choose([external], mode: .follow, mouse: (5000, 5000)) == external)        // off every screen: the only one
+        #expect(IslandPlacement.choose([laptop, external], mode: .follow, mouse: nil) == laptop)
+        #expect(IslandPlacement.choose([external], mode: .follow, mouse: (5000, 5000)) == external)
     }
     @Test func builtinAndMainModes() {
         #expect(IslandPlacement.choose([laptop, external], mode: .builtin, mouse: (2000, 800)) == laptop)
         var ext = external; ext.isMain = true; var lap = laptop; lap.isMain = false
         #expect(IslandPlacement.choose([lap, ext], mode: .main, mouse: (100, 100)) == ext)
-        #expect(IslandPlacement.choose([ext], mode: .builtin, mouse: nil) == ext)                           // clamshell: no notch screen
+        #expect(IslandPlacement.choose([ext], mode: .builtin, mouse: nil) == ext)
         #expect(IslandPlacement.choose([], mode: .follow, mouse: nil) == nil)
     }
 
@@ -27,10 +27,10 @@ struct DisplayTests {
         #expect(s.toImage(gx, gy) == (640, 360))
         let (lx, ly) = s.toLocal(640, 360); #expect(lx == 1280 && ly == 720)
         #expect(s.contains(1600, 0) && !s.contains(100, 100) && !s.contains(1512 + 2560, 0))
-        let (cx, cy) = s.toDisplay(-50, 99999); #expect(cx == 1512 && cy == -200 + 1439)                    // clamped to the display
+        let (cx, cy) = s.toDisplay(-50, 99999); #expect(cx == 1512 && cy == -200 + 1439)
     }
     @Test func primaryDisplayIsUnchanged() {
-        let s = ScreenScale(displayWidth: 1024, displayHeight: 640)   // fits unscaled, no origin
+        let s = ScreenScale(displayWidth: 1024, displayHeight: 640)
         let (x, y) = s.toDisplay(100, 50); #expect(x == 100 && y == 50)
         #expect(s.toImage(100, 50) == (100, 50))
     }

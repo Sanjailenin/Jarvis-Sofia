@@ -11,19 +11,19 @@ import Testing
         #expect(KeyMap.parse("A")! == (0, KeyMap.shift))
         #expect(KeyMap.parse("cmd+alt+Escape")! == (53, KeyMap.command | KeyMap.option))
         #expect(KeyMap.parse("F5")! == (96, 0))
-        #expect(KeyMap.parse("hyper+x") == nil)       // unknown modifier: refuse rather than press something else
+        #expect(KeyMap.parse("hyper+x") == nil)
         #expect(KeyMap.parse("superduper") == nil)
         #expect(KeyMap.parse("") == nil)
     }
 
     @Test func coordinatesMapBackToTheScreen() {
-        let s = ScreenScale(displayWidth: 1512, displayHeight: 982)      // 14" MacBook Pro in points
+        let s = ScreenScale(displayWidth: 1512, displayHeight: 982)
         #expect(s.imageWidth <= 1280 && s.imageHeight <= 800)
         let (x, y) = s.toDisplay(Double(s.imageWidth) / 2, Double(s.imageHeight) / 2)
         #expect(abs(x - 756) < 1 && abs(y - 491) < 1)
-        let (cx, cy) = s.toDisplay(99_999, -50)                            // clamped onto the screen
+        let (cx, cy) = s.toDisplay(99_999, -50)
         #expect(cx == 1511 && cy == 0)
-        #expect(ScreenScale(displayWidth: 1024, displayHeight: 640).scale == 1)   // small screens aren't enlarged
+        #expect(ScreenScale(displayWidth: 1024, displayHeight: 640).scale == 1)
     }
 
     @Test func typedTextKeepsCharactersWhole() {
@@ -34,7 +34,7 @@ import Testing
         let s = String(repeating: "x", count: 15) + "😀"
         let c = TypedText.chunks(s)
         #expect(c.count == 2 && c[0].count == 15 && c[1] == Array("😀".utf16))
-        #expect(TypedText.chunks("🇩🇪", maxUnits: 2) == [Array("🇩🇪".utf16)])     // one character bigger than a chunk still goes whole
+        #expect(TypedText.chunks("🇩🇪", maxUnits: 2) == [Array("🇩🇪".utf16)])
     }
 
     @Test func modifierNamesForClicks() {
