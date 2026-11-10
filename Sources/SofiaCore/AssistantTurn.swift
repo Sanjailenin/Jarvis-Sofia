@@ -22,6 +22,7 @@ public struct TurnResult: Equatable {
 
 public actor AssistantTurn {
     private var history: [String: [ChatMessage]] = [:]
+    private var lastVideoSearch: [String: String] = [:]
     private let memory: MemoryStoring
     private let performer: ActionPerformer
     public static let maxRounds = 6
@@ -32,9 +33,32 @@ public actor AssistantTurn {
     public func clear(_ channel: String) { history[channel] = nil }
 
     public func run(_ text: String, channel: String, provider: ModelProvider, ownerName: String, allowComputer: Bool, assistantName: String = WakeWord.defaultName, onSentence: (@Sendable (String) -> Void)? = nil, progress: (@Sendable (String) -> Void)? = nil) async throws -> TurnResult {
+        currentChannel = channel
         var messages = history[channel] ?? []
         messages.append(.user(text))
         var performed: [String] = [], failed: [String] = []
+        var quickMatch = QuickCommand.match(text)
+        if quickMatch == nil, QuickCommand.firstResult(text), let q = lastVideoSearch[channel], let a = MacAction(["action": "play_video", "target": q]) {
+            quickMatch = (a, "Playing the first video for \(q).")
+        }
+        if let quick = quickMatch {
+            noteVideo(quick.action, channel: channel)
+            let reply: String
+            switch await performer.perform(quick.action) {
+            case .done: performed.append(quick.action.summary); reply = quick.reply
+            case .failed(let why): failed.append(why); reply = ""
+            }
+            var args: [String: String] = [:]
+            if !quick.action.target.isEmpty { args["target"] = quick.action.target }
+            if !quick.action.value.isEmpty { args["value"] = quick.action.value }
+            let json = (try? JSONSerialization.data(withJSONObject: args)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+            let call = ToolCall(id: "quick_\(UUID().uuidString.prefix(8))", name: quick.action.kind.rawValue, arguments: json)
+            messages.append(.assistant("", calls: [call]))
+            messages.append(.tool(call.id, reply.isEmpty ? "Failed: \(failed.joined(separator: "; "))" : "Done: \(quick.action.summary)."))
+            messages.append(.assistant(reply.isEmpty ? "I couldn't do that." : reply, calls: []))
+            history[channel] = Array(messages.suffix(Self.historyKept))
+            return TurnResult(reply: reply, performed: performed, failed: failed)
+        }
         var reply = ""
         let tools = allowComputer ? Prompt.tools + [Prompt.computerTask] : Prompt.tools
         for _ in 0..<Self.maxRounds {
@@ -57,12 +81,24 @@ public actor AssistantTurn {
         return TurnResult(reply: reply, performed: performed, failed: failed)
     }
 
+    private var currentChannel = ""
+
+    private func noteVideo(_ a: MacAction, channel: String) {
+        if (a.kind == .webSearch && a.value == "youtube") || a.kind == .playVideo { lastVideoSearch[channel] = a.target }
+    }
+
     private func handle(_ call: ToolCall, performed: inout [String], failed: inout [String], progress: (@Sendable (String) -> Void)?) async -> String {
         switch call.name {
-        case "mac_control":
-            guard let action = MacAction(call.input) else { return "Refused: not a valid Mac action." }
+        case "mac_control", _ where MacAction.Kind(rawValue: call.name) != nil:
+            var input = call.input
+            if call.name != "mac_control" { input["action"] = call.name }
+            guard let action = MacAction(input) else { return "Refused: not a valid Mac action." }
+            noteVideo(action, channel: currentChannel)
             switch await performer.perform(action) {
-            case .done(let note): performed.append(action.summary); return note.isEmpty ? "Done: \(action.summary)." : note
+            case .done(let note):
+                performed.append(action.summary)
+                let base = note.isEmpty ? "Done: \(action.summary)." : note
+                return action.kind == .webSearch || action.kind == .openURL ? base + " The page is open on screen for the user; you have not seen it, so don't describe what it shows." : base
             case .failed(let why): failed.append(why); return "Failed: \(why)"
             }
         case "computer_task":

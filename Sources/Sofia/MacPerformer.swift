@@ -13,7 +13,14 @@ struct MacPerformer: ActionPerformer {
 
     func computerTask(_ goal: String, progress: @escaping @Sendable (String) -> Void) async -> String {
         guard await MainActor.run(body: { settings.allowComputer }) else { return "Using the screen, mouse and keyboard is switched off in Settings." }
-        guard await MainActor.run(body: { InputDriver.hasPermission }) else { return "Accessibility permission is off for Sofia, so I can't use the mouse and keyboard." }
+        let access = await MainActor.run { () -> (input: Bool, screen: Bool) in
+            let input = InputDriver.hasPermission, screen = ScreenCapture.hasPermission
+            if !input { InputDriver.requestPermission() }
+            if !screen { ScreenCapture.requestPermission() }
+            return (input, screen)
+        }
+        guard access.input else { return "I need Accessibility permission to use the mouse and keyboard. macOS has just asked: turn Sofia on in System Settings, Privacy and Security, Accessibility, then ask me again." }
+        guard access.screen else { return "I need Screen Recording permission to see the screen. macOS has just asked: turn Sofia on in System Settings, Privacy and Security, Screen and System Audio Recording, then quit and reopen me and ask again." }
         let provider = await MainActor.run { settings.visionProvider }
         WakeLog.event("computer task")
         return await ComputerLoop.run(goal: goal, host: MacComputerHost(), provider: provider) { p in progress(p); progressSink(p) }

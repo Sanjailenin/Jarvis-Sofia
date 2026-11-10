@@ -25,6 +25,7 @@ struct SettingsView: View {
                 TextField("Vision model for screen tasks (e.g. qwen2.5vl:7b, gemma3:12b)", text: $settings.visionModel).textFieldStyle(.roundedBorder)
                 Toggle("Let the model think before answering (slower, more careful)", isOn: $settings.thinking)
                 Toggle("Let her use the screen, mouse and keyboard for multi-step tasks", isOn: $settings.allowComputer)
+                if settings.allowComputer { ScreenAccessRow() }
                 HStack {
                     Text(fields.ollamaState.isEmpty ? "Everything you say to the notch is answered here, on this Mac." : fields.ollamaState).font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -153,6 +154,54 @@ struct WakeHelp {
             ]
             button = "Open Speech Recognition Settings"
             url = URL(string: privacy + "Privacy_SpeechRecognition")!
+        }
+    }
+}
+
+@MainActor
+final class ScreenAccess: ObservableObject {
+    @Published var screen = ScreenCapture.hasPermission
+    @Published var input = InputDriver.hasPermission
+    private var timer: Timer?
+    init() {
+        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                let s = ScreenCapture.hasPermission, i = InputDriver.hasPermission
+                if s != self.screen { self.screen = s }
+                if i != self.input { self.input = i }
+            }
+        }
+    }
+    deinit { timer?.invalidate() }
+}
+
+struct ScreenAccessRow: View {
+    @StateObject private var access = ScreenAccess()
+    private var screen: Bool { access.screen }
+    private var input: Bool { access.input }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            row("Screen Recording", on: screen, pane: "Privacy_ScreenCapture") { ScreenCapture.requestPermission() }
+            row("Accessibility", on: input, pane: "Privacy_Accessibility") { InputDriver.requestPermission() }
+            if !screen || !input {
+                Text("Screen tasks need both. Click Allow, turn Sofia on in the list that opens (use + and pick Sofia from Applications if it isn't listed), then quit and reopen Sofia.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func row(_ name: String, on: Bool, pane: String, request: @escaping () -> Void) -> some View {
+        HStack {
+            Image(systemName: on ? "checkmark.circle.fill" : "exclamationmark.circle").foregroundStyle(on ? .green : .orange)
+            Text("\(name): \(on ? "allowed" : "not allowed")").font(.caption)
+            Spacer()
+            if !on {
+                Button("Allow") {
+                    request()
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(url) }
+                }
+            }
         }
     }
 }

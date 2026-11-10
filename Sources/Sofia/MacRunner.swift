@@ -17,8 +17,12 @@ enum MacRunner {
     private static func run(_ a: MacAction) async throws -> String? {
         switch a.kind {
         case .openApp:
-            guard let url = appURL(named: a.target) else { throw Failure("no app called \(a.target)") }
-            _ = try await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+            if let url = appURL(named: a.target) {
+                _ = try await NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+            } else if let site = MacAction.websiteURL(a.target) {
+                guard NSWorkspace.shared.open(site) else { throw Failure("couldn't open the \(a.target) website") }
+                return "There is no \(a.target) app, so its website is open in the browser."
+            } else { throw Failure("no app called \(a.target)") }
         case .quitApp:
             let apps = running(named: a.target)
             guard !apps.isEmpty else { throw Failure("\(a.target) isn't open") }
@@ -74,6 +78,17 @@ enum MacRunner {
             let q = a.target.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
             if appURL(named: "Spotify") != nil, let u = URL(string: "spotify:search:\(q)") { NSWorkspace.shared.open(u) }
             else if let u = URL(string: "https://music.apple.com/search?term=\(q)") { NSWorkspace.shared.open(u) }
+        case .playVideo:
+            guard let search = MacAction.searchURL(a.target, site: "youtube") else { throw Failure("couldn't search YouTube") }
+            var req = URLRequest(url: search, timeoutInterval: 8)
+            req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+            req.setValue("en", forHTTPHeaderField: "Accept-Language")
+            if let (data, _) = try? await URLSession.shared.data(for: req), let id = MacAction.firstYouTubeVideo(in: String(decoding: data, as: UTF8.self)), let watch = URL(string: "https://www.youtube.com/watch?v=\(id)") {
+                NSWorkspace.shared.open(watch)
+                return "Playing the first YouTube video for \(a.target)."
+            }
+            NSWorkspace.shared.open(search)
+            return "Couldn't pick a video, so the YouTube results for \(a.target) are open."
         case .openSettings:
             guard let id = MacAction.settingsPages[a.target], let u = URL(string: "x-apple.systempreferences:\(id)") else { throw Failure("unknown settings page") }
             NSWorkspace.shared.open(u)

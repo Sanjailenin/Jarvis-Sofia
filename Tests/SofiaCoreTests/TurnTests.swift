@@ -197,3 +197,168 @@ struct ComputerLoopTests {
         #expect((await ComputerLoop.run(goal: "x", host: host, provider: blind) { _ in }).contains("no vision"))
     }
 }
+
+struct ActionToolTests {
+    @Test func actionNamedCallsRun() async throws {
+        let performer = FakePerformer()
+        let provider = ScriptedProvider([ChatReply(text: "", calls: [
+            ToolCall(id: "a", name: "open_app", arguments: #"{"target":"YouTube"}"#),
+            ToolCall(id: "b", name: "web_search", arguments: #"{"target":"lofi music","value":"youtube"}"#),
+        ]), ChatReply(text: "Searching YouTube for lofi music.")])
+        let turn = AssistantTurn(memory: FakeMemory(), performer: performer)
+        let r = try await turn.run("find me some calm music to work to", channel: "mac", provider: provider, ownerName: "", allowComputer: false)
+        #expect(performer.performed.map(\.kind) == [.openURL, .webSearch])
+        #expect(performer.performed.last?.target == "lofi music" && performer.performed.last?.value == "youtube")
+        #expect(r.performed.count == 2 && r.reply == "Searching YouTube for lofi music.")
+    }
+
+    @Test func everyActionIsItsOwnTool() {
+        let names = Set(Prompt.tools.map(\.name))
+        for k in MacAction.Kind.allCases { #expect(names.contains(k.rawValue), Comment(rawValue: k.rawValue)) }
+        #expect(!names.contains("mac_control"))
+        for t in Prompt.tools where MacAction.Kind(rawValue: t.name) != nil {
+            #expect(!t.description.isEmpty)
+            #expect((t.parameters["properties"] as? [String: Any])?["action"] == nil)
+        }
+    }
+
+    @Test func unknownToolIsRefused() async throws {
+        let performer = FakePerformer()
+        let provider = ScriptedProvider([ChatReply(text: "", calls: [ToolCall(id: "x", name: "rm_rf", arguments: "{}")]), ChatReply(text: "I can't do that.")])
+        let r = try await AssistantTurn(memory: FakeMemory(), performer: performer).run("x", channel: "mac", provider: provider, ownerName: "", allowComputer: false)
+        #expect(performer.performed.isEmpty && provider.seen[1].last?.content == "Unknown tool.")
+        #expect(r.reply == "I can't do that.")
+    }
+}
+
+struct ActionValueTests {
+    @Test func numbersAndBooleansFromTheModelAreAccepted() {
+        #expect(MacAction(["action": "set_volume", "value": 30])?.value == "30")
+        #expect(MacAction(["action": "set_volume", "value": 30.0])?.value == "30")
+        #expect(MacAction(["action": "dark_mode", "value": true])?.value == "on")
+        #expect(MacAction(["action": "wifi", "value": false])?.value == "off")
+        #expect(MacAction(["action": "set_volume", "value": 300]) == nil)
+        #expect(MacAction(["action": "set_volume", "value": "down to 30"])?.value == "30")
+        #expect(MacAction(["action": "set_volume", "value": "30%"])?.value == "30")
+        #expect(MacAction(["action": "set_volume", "value": "a bit louder"])?.value == "up")
+        #expect(MacAction(["action": "set_volume", "value": "Down"])?.value == "down")
+    }
+
+    @Test func searchResultsAreNotDescribed() async throws {
+        let provider = ScriptedProvider([ChatReply(text: "", calls: [ToolCall(id: "s", name: "web_search", arguments: #"{"target":"weather in Paris"}"#)]), ChatReply(text: "The results are on screen.")])
+        _ = try await AssistantTurn(memory: FakeMemory(), performer: FakePerformer()).run("weather", channel: "mac", provider: provider, ownerName: "", allowComputer: false)
+        #expect(provider.seen[1].last?.content.contains("you have not seen it") == true)
+    }
+}
+
+struct QuickCommandTests {
+    @Test func simpleCommandsSkipTheModel() {
+        let cases: [(String, MacAction.Kind, String)] = [
+            ("mute", .mute, ""), ("Mute.", .mute, ""), ("please mute the sound", .mute, ""), ("unmute", .unmute, ""),
+            ("pause", .media, "play_pause"), ("pause the music", .media, "play_pause"), ("next song", .media, "next"), ("skip", .media, "next"),
+            ("lock the screen", .lockScreen, ""), ("dark mode on", .darkMode, "on"), ("turn on dark mode", .darkMode, "on"),
+            ("turn off dark mode", .darkMode, "off"), ("volume up", .setVolume, "up"), ("quieter", .setVolume, "down"),
+            ("set the volume to 30", .setVolume, "30"), ("volume 50 percent", .setVolume, "50"),
+        ]
+        for (text, kind, value) in cases {
+            let m = QuickCommand.match(text)
+            #expect(m?.action.kind == kind, Comment(rawValue: text))
+            #expect((m?.action.value ?? "") == value, Comment(rawValue: text))
+        }
+    }
+
+    @Test func anythingMoreGoesToTheModel() {
+        for text in ["find me some calm music", "mute Slack notifications", "play Shape of You", "what's the weather", "next week's meetings", "lock in the plan for tomorrow", "volume 300"] {
+            #expect(QuickCommand.match(text) == nil, Comment(rawValue: text))
+        }
+    }
+
+    @Test func quickCommandRunsWithoutAProvider() async throws {
+        let performer = FakePerformer()
+        let r = try await AssistantTurn(memory: FakeMemory(), performer: performer).run("mute", channel: "mac", provider: ScriptedProvider([]), ownerName: "", allowComputer: false)
+        #expect(performer.performed.map(\.kind) == [.mute] && r.reply == "Muted.")
+        let provider = ScriptedProvider([ChatReply(text: "Notion is open.", calls: [])])
+        let turn = AssistantTurn(memory: FakeMemory(), performer: performer)
+        _ = try await turn.run("mute", channel: "mac", provider: provider, ownerName: "", allowComputer: false)
+        _ = try await turn.run("open notion", channel: "mac", provider: provider, ownerName: "", allowComputer: false)
+        let history = provider.seen[0]
+        #expect(history.contains { $0.role == .assistant && $0.toolCalls.first?.name == "mute" })
+        #expect(history.contains { $0.role == .tool && $0.content.hasPrefix("Done") })
+    }
+}
+
+struct WebsiteTests {
+    @Test func websitesOpenAsPages() {
+        let a = MacAction(["action": "open_app", "target": "YouTube"])
+        #expect(a?.kind == .openURL && a?.target == "https://www.youtube.com")
+        #expect(MacAction(["action": "open_app", "target": "gmail.com"])?.target == "https://mail.google.com")
+        #expect(MacAction(["action": "open_app", "target": "Safari"])?.kind == .openApp)
+        #expect(MacAction(["action": "open_app", "target": "WhatsApp"])?.kind == .openApp)
+    }
+
+    @Test func siteSearchesSkipTheModel() {
+        let cases: [(String, String, String)] = [
+            ("search lofi music on YouTube", "lofi music", "youtube"),
+            ("search for Arijit Singh songs on youtube", "arijit singh songs", "youtube"),
+            ("open YouTube and search for lofi music", "lofi music", "youtube"),
+            ("search YouTube for cooking videos", "cooking videos", "youtube"),
+            ("look up the Eiffel Tower on Wikipedia", "the eiffel tower", "wikipedia"),
+            ("search Google for weather in Paris", "weather in paris", "google"),
+        ]
+        for (text, query, site) in cases {
+            let m = QuickCommand.match(text)
+            #expect(m?.action.kind == .webSearch && m?.action.target == query && m?.action.value == site, Comment(rawValue: text))
+        }
+        #expect(QuickCommand.match("open YouTube")?.action.target == "https://www.youtube.com")
+        #expect(QuickCommand.match("go to the Netflix website")?.action.target == "https://www.netflix.com")
+        #expect(QuickCommand.match("open Safari") == nil)
+    }
+}
+
+struct AnySiteTests {
+    @Test func searchInsideAnySite() {
+        #expect(MacAction.searchURL("lofi music", site: "youtube")?.absoluteString == "https://www.youtube.com/results?search_query=lofi%20music")
+        #expect(MacAction.searchURL("noise cancelling headphones", site: "amazon")?.absoluteString == "https://duckduckgo.com/?q=%21amazon%20noise%20cancelling%20headphones")
+        #expect(MacAction.searchURL("swift testing", site: "github.com")?.absoluteString == "https://duckduckgo.com/?q=%21github%20swift%20testing")
+        #expect(MacAction.searchURL("x", site: "bad/site") == nil)
+        #expect(MacAction(["action": "web_search", "target": "inception", "value": "IMDb"])?.value == "imdb")
+    }
+
+    @Test func openAnySite() {
+        #expect(MacAction(["action": "open_app", "target": "booking.com"])?.target == "https://booking.com")
+        #expect(MacAction.websiteURL("Netflix")?.absoluteString == "https://www.netflix.com")
+        #expect(MacAction.websiteURL("Hacker News")?.absoluteString.hasPrefix("https://duckduckgo.com/?q=%5C") == true)
+        #expect(QuickCommand.match("open booking.com")?.action.target == "https://booking.com")
+        let m = QuickCommand.match("search noise cancelling headphones on Amazon")
+        #expect(m?.action.kind == .webSearch && m?.action.value == "amazon" && m?.action.target == "noise cancelling headphones")
+        #expect(QuickCommand.match("search reddit for mechanical keyboards")?.action.value == "reddit")
+        #expect(QuickCommand.match("search for files in Downloads") == nil)
+        #expect(QuickCommand.match("open Spotify and play some jazz") == nil)
+        #expect(QuickCommand.match("open Amazon and search for a desk lamp")?.action.target == "a desk lamp")
+        #expect(QuickCommand.match("open booking.com")?.reply == "Opening booking.com.")
+    }
+}
+
+struct VideoTests {
+    @Test func firstVideoIdFromResults() {
+        let html = #"..."videoId":"abc"... {"videoRenderer":{"videoId":"dQw4w9WgXcQ","thumbnail":{}} ... "videoId":"zzzzzzzzzzz""#
+        #expect(MacAction.firstYouTubeVideo(in: html) == "dQw4w9WgXcQ")
+        #expect(MacAction.firstYouTubeVideo(in: "no videos here") == nil)
+    }
+
+    @Test func playOnYouTubeAndFirstResult() async throws {
+        #expect(QuickCommand.match("play Shape of You on YouTube")?.action.kind == .playVideo)
+        #expect(QuickCommand.match("watch lofi beats on youtube")?.action.target == "lofi beats")
+        for t in ["play the first video", "click on the first video", "open the first one", "play the first result please", "Play the first video."] {
+            #expect(QuickCommand.firstResult(t), Comment(rawValue: t))
+        }
+        #expect(!QuickCommand.firstResult("play the first season of Friends"))
+
+        let performer = FakePerformer()
+        let turn = AssistantTurn(memory: FakeMemory(), performer: performer)
+        _ = try await turn.run("search lofi music on YouTube", channel: "mac", provider: ScriptedProvider([]), ownerName: "", allowComputer: false)
+        let r = try await turn.run("play the first video", channel: "mac", provider: ScriptedProvider([]), ownerName: "", allowComputer: false)
+        #expect(performer.performed.last?.kind == .playVideo && performer.performed.last?.target == "lofi music")
+        #expect(r.reply == "Playing the first video for lofi music.")
+    }
+}

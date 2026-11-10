@@ -5,7 +5,7 @@ public struct MacAction: Equatable {
         case openApp = "open_app", quitApp = "quit_app", switchApp = "switch_app", openURL = "open_url", openPath = "open_path"
         case setVolume = "set_volume", mute, unmute, darkMode = "dark_mode", media, wifi, lockScreen = "lock_screen", screenshot
         case typeText = "type_text"
-        case webSearch = "web_search", findFile = "find_file", playMusic = "play_music", openSettings = "open_settings"
+        case webSearch = "web_search", findFile = "find_file", playMusic = "play_music", playVideo = "play_video", openSettings = "open_settings"
         case clipboardCopy = "clipboard_copy", newNote = "new_note"
         case openDeeplink = "open_deeplink"      // an app link (spotify:, slack://…) from the fixed scheme list
         case moveWindow = "move_window"
@@ -29,11 +29,53 @@ public struct MacAction: Equatable {
         "appearance": "com.apple.Appearance-Settings.extension", "wallpaper": "com.apple.Wallpaper-Settings.extension",
     ]
 
+    public static let webSites: [String: String] = [
+        "youtube": "https://www.youtube.com", "youtube music": "https://music.youtube.com", "gmail": "https://mail.google.com",
+        "google": "https://www.google.com", "google maps": "https://www.google.com/maps", "maps": "https://www.google.com/maps",
+        "google drive": "https://drive.google.com", "google docs": "https://docs.google.com", "google calendar": "https://calendar.google.com",
+        "netflix": "https://www.netflix.com", "wikipedia": "https://www.wikipedia.org", "reddit": "https://www.reddit.com",
+        "twitter": "https://x.com", "x": "https://x.com", "github": "https://github.com", "linkedin": "https://www.linkedin.com",
+        "instagram": "https://www.instagram.com", "facebook": "https://www.facebook.com", "amazon": "https://www.amazon.com",
+        "chatgpt": "https://chatgpt.com", "prime video": "https://www.primevideo.com", "twitch": "https://www.twitch.tv",
+    ]
+
+    public static func site(_ name: String) -> String? {
+        let n = name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: #"\.com$"#, with: "", options: .regularExpression)
+        return webSites[n]
+    }
+
+    static let domainPattern = #"^(?:[a-z0-9-]+\.)+[a-z]{2,}$"#
+    static let siteNamePattern = #"^[a-z0-9][a-z0-9 .'&-]{0,40}$"#
+
+    public static func firstYouTubeVideo(in html: String) -> String? {
+        guard let r = html.range(of: #""videoId":"([A-Za-z0-9_-]{11})""#, options: .regularExpression) else { return nil }
+        return String(html[r].dropFirst(11).dropLast(1))
+    }
+
+    public static func isDomain(_ s: String) -> Bool { s.lowercased().range(of: domainPattern, options: .regularExpression) != nil }
+
+    static func encode(_ s: String) -> String? {
+        var allowed = CharacterSet.urlQueryAllowed; allowed.remove(charactersIn: "&+=?#/!")
+        return s.addingPercentEncoding(withAllowedCharacters: allowed)
+    }
+
+    public static func websiteURL(_ name: String) -> URL? {
+        let n = name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if let known = site(n) { return URL(string: known) }
+        if isDomain(n) { return URL(string: "https://" + n) }
+        guard n.range(of: siteNamePattern, options: .regularExpression) != nil, let q = encode("\\" + n + " official site") else { return nil }
+        return URL(string: "https://duckduckgo.com/?q=" + q)
+    }
+
     public static func searchURL(_ query: String, site: String) -> URL? {
-        guard let base = searchURLs[site] else { return nil }
-        var allowed = CharacterSet.urlQueryAllowed; allowed.remove(charactersIn: "&+=?#/")
-        guard let q = query.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
-        return URL(string: base + q)
+        let s = site.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if let base = searchURLs[s] { return encode(query).flatMap { URL(string: base + $0) } }
+        guard s.range(of: siteNamePattern, options: .regularExpression) != nil else { return nil }
+        let bang = s.replacingOccurrences(of: #"^www\."#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\.(com|org|net|io|co|tv|de|fr|co\.uk|in)$"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"[^a-z0-9]"#, with: "", options: .regularExpression)
+        guard !bang.isEmpty, let q = encode("!" + bang + " " + query) else { return nil }
+        return URL(string: "https://duckduckgo.com/?q=" + q)
     }
     public let kind: Kind
     public let target: String
@@ -43,8 +85,12 @@ public struct MacAction: Equatable {
 
     public init?(_ raw: [String: Any]) {
         guard let k = Kind(rawValue: raw["action"] as? String ?? "") else { return nil }
-        let target = (raw["target"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        let value = (raw["value"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let target = Self.text(raw["target"]).trimmingCharacters(in: .whitespacesAndNewlines)
+        var value = Self.text(raw["value"]).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if k == .setVolume { value = Self.volume(value) }
+        if [.openApp, .switchApp].contains(k), let url = Self.site(target) ?? (Self.isDomain(target) ? "https://" + target.lowercased() : nil) {
+            self.kind = .openURL; self.target = url; self.value = ""; return
+        }
         switch k {
         case .openApp, .quitApp, .switchApp:
             guard target.range(of: #"^[\p{L}\p{N} .&+'’()-]{1,60}$"#, options: .regularExpression) != nil else { return nil }
@@ -66,11 +112,11 @@ public struct MacAction: Equatable {
         case .typeText:
             guard !target.isEmpty, target.count <= 500 else { return nil }
         case .webSearch:
-            guard !target.isEmpty, target.count <= 200, Self.searchURLs[value.isEmpty ? "google" : value] != nil else { return nil }
+            guard !target.isEmpty, target.count <= 200, Self.searchURL(target, site: value.isEmpty ? "google" : value) != nil else { return nil }
             self.kind = k; self.target = target; self.value = value.isEmpty ? "google" : value; return
         case .findFile:
             guard !target.isEmpty, target.count <= 100, target.rangeOfCharacter(from: CharacterSet(charactersIn: "/\\*?")) == nil else { return nil }
-        case .playMusic:
+        case .playMusic, .playVideo:
             guard !target.isEmpty, target.count <= 120 else { return nil }
         case .openSettings:
             guard Self.settingsPages[target.lowercased()] != nil else { return nil }
@@ -82,7 +128,7 @@ public struct MacAction: Equatable {
         case .moveWindow:
             guard target.lowercased() == "front" || target.range(of: #"^[\p{L}\p{N} .&+'’()-]{1,60}$"#, options: .regularExpression) != nil, WindowGeometry.placements.contains(value) else { return nil }
         case .setPreference:
-            guard let p = Preference(rawValue: target.lowercased()), let v = p.normalize(raw["value"] as? String ?? "") else { return nil }
+            guard let p = Preference(rawValue: target.lowercased()), let v = p.normalize(Self.text(raw["value"])) else { return nil }
             self.kind = k; self.target = p.rawValue; self.value = v; return
         case .focus:
             guard ["on", "off"].contains(value) else { return nil }
@@ -90,6 +136,21 @@ public struct MacAction: Equatable {
             guard target.range(of: #"^[\p{L}\p{N} .&+'’()-]{1,60}$"#, options: .regularExpression) != nil else { return nil }
         }
         self.kind = k; self.target = target; self.value = value
+    }
+
+    static func volume(_ v: String) -> String {
+        if let r = v.range(of: #"\d{1,3}"#, options: .regularExpression) { return String(v[r]) }
+        if v.contains("up") || v.contains("louder") || v.contains("higher") { return "up" }
+        if v.contains("down") || v.contains("quieter") || v.contains("lower") { return "down" }
+        return v
+    }
+
+    static func text(_ any: Any?) -> String {
+        switch any {
+        case let s as String: return s
+        case let n as NSNumber: return CFGetTypeID(n) == CFBooleanGetTypeID() ? (n.boolValue ? "on" : "off") : n.stringValue
+        default: return ""
+        }
     }
 
     public static func list(from raw: Any?) -> (actions: [MacAction], rejected: Int) {
@@ -122,6 +183,7 @@ public struct MacAction: Equatable {
         case .webSearch: return "search \(value) for \(target)"
         case .findFile: return "find \(target)"
         case .playMusic: return "play \(target)"
+        case .playVideo: return "play \(target) on YouTube"
         case .openSettings: return "open \(target) settings"
         case .clipboardCopy: return "copy to clipboard"
         case .moveWindow: return "move \(target) \(value.replacingOccurrences(of: "_", with: " "))"

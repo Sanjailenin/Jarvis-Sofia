@@ -35,7 +35,7 @@ import Testing
     @Test func searchAndEverydayActions() {
         #expect(MacAction(["action": "web_search", "target": "flights to Lisbon"])?.value == "google")
         #expect(MacAction(["action": "web_search", "target": "lo-fi", "value": "YouTube"])?.value == "youtube")
-        #expect(MacAction(["action": "web_search", "target": "x", "value": "darkweb"]) == nil)
+        #expect(MacAction(["action": "web_search", "target": "x", "value": "javascript:alert(1)"]) == nil)
         #expect(MacAction.searchURL("a&b=c d", site: "google")?.absoluteString == "https://www.google.com/search?q=a%26b%3Dc%20d")
         #expect(MacAction.searchURL("cafés Lisbon", site: "maps")?.absoluteString == "https://www.google.com/maps/search/caf%C3%A9s%20Lisbon")
         #expect(MacAction(["action": "find_file", "target": "thesis draft"]) != nil)
