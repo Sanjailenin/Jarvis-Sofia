@@ -33,10 +33,9 @@ struct SettingsView: View {
             }
             Section("Voice") {
                 Picker("Voice", selection: $settings.voiceName) {
-                    Text("Best British voice available").tag("")
-                    ForEach(Speech.britishVoices, id: \.identifier) { v in Text("\(v.name) (\(v.quality == .enhanced || v.quality == .premium ? "enhanced" : "standard"))").tag(v.identifier) }
+                    ForEach(SofiaVoice.all) { v in Text(v.label).tag(v.id) }
                 }
-                Text("Enhanced voices such as Daniel, Serena or Kate download from System Settings → Accessibility → Spoken Content → System Voice → Manage Voices.").font(.caption).foregroundStyle(.secondary)
+                Text(Kokoro.installed ? "Six natural voices that run on this Mac. Nothing is sent anywhere." : "Her voices aren't downloaded yet, so the Mac's own voice is used. Run the installer again to get them: \(Speech.installCommand)").font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 HStack { SecureField("ElevenLabs API key (optional, for a premium voice)", text: $fields.elevenLabsKey); Button("Save") { save(settings.elevenLabsKey, fields.elevenLabsKey) } }
                 TextField("ElevenLabs voice id (optional)", text: $settings.elevenLabsVoice).textFieldStyle(.roundedBorder)
             }

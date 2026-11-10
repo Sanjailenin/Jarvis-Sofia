@@ -19,6 +19,10 @@ main() {
     uninstall
     return 0
   fi
+  if [ "${1:-}" = "--voices" ]; then
+    setup_voices
+    return 0
+  fi
 
   [ "$(uname -s)" = "Darwin" ] || die "Sofia runs on macOS only."
   local major
@@ -29,6 +33,9 @@ main() {
 
   if [ -z "${SOFIA_SKIP_MODEL:-}" ]; then
     setup_model
+  fi
+  if [ -z "${SOFIA_SKIP_VOICES:-}" ]; then
+    setup_voices
   fi
   install_app
 }
@@ -102,6 +109,42 @@ setup_model() {
   fi
   say "Pulling the model: $MODEL (this is the slow part)"
   "$OLLAMA" pull "$MODEL" </dev/null || die "Couldn't download the model $MODEL. Check your connection and run this again."
+}
+
+VOICES_VERSION="kokoro-multi-lang-v1_0 sherpa-onnx-v1.13.8"
+ENGINE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-v1.13.8-osx-arm64-shared-lib.tar.bz2"
+ENGINE_SHA="ae77050cdae565496059d96f5ab33d77b397a0864282a4e4a26e3b3b3effb948"
+VOICES_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2"
+VOICES_SHA="60703707bc05ccd48d60e1eb723f38b07d6e474795a0b6a588d7220400e0f7a4"
+
+fetch_checked() {
+  curl -fL --progress-bar -o "$2" "$1" </dev/null || return 1
+  [ "$(shasum -a 256 "$2" | cut -d' ' -f1)" = "$3" ]
+}
+
+setup_voices() {
+  local dest="$HOME/Library/Application Support/Sofia/Voices"
+  if [ "$(cat "$dest/version" 2>/dev/null)" = "$VOICES_VERSION" ]; then
+    return 0
+  fi
+  say "Downloading her voices (about 360 MB, once)"
+  local tmp
+  tmp=$(mktemp -d)
+  if ! fetch_checked "$ENGINE_URL" "$tmp/engine.tar.bz2" "$ENGINE_SHA" || ! fetch_checked "$VOICES_URL" "$tmp/voices.tar.bz2" "$VOICES_SHA"; then
+    rm -rf "$tmp"
+    echo "Couldn't download the voices, so Sofia will use the Mac's own voice. Run this again later to add them."
+    return 0
+  fi
+  mkdir -p "$tmp/out/lib" "$tmp/out/kokoro"
+  tar -xjf "$tmp/engine.tar.bz2" -C "$tmp" </dev/null
+  cp "$tmp"/sherpa-onnx-v1.13.8-osx-arm64-shared-lib/lib/libsherpa-onnx-c-api.dylib "$tmp"/sherpa-onnx-v1.13.8-osx-arm64-shared-lib/lib/libonnxruntime.dylib "$tmp/out/lib/"
+  tar -xjf "$tmp/voices.tar.bz2" -C "$tmp" kokoro-multi-lang-v1_0/model.onnx kokoro-multi-lang-v1_0/voices.bin kokoro-multi-lang-v1_0/tokens.txt kokoro-multi-lang-v1_0/LICENSE kokoro-multi-lang-v1_0/espeak-ng-data </dev/null
+  mv "$tmp"/kokoro-multi-lang-v1_0/* "$tmp/out/kokoro/"
+  echo "$VOICES_VERSION" > "$tmp/out/version"
+  mkdir -p "$(dirname "$dest")"
+  rm -rf "$dest"
+  mv "$tmp/out" "$dest"
+  rm -rf "$tmp"
 }
 
 install_app() {

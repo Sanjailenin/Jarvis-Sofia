@@ -7,7 +7,8 @@ let package = Package(
     products: [.executable(name: "Sofia", targets: ["Sofia"])],
     targets: [
         .target(name: "SofiaCore"),
-        .executableTarget(name: "Sofia", dependencies: ["SofiaCore"]),
+        .systemLibrary(name: "CSherpa"),
+        .executableTarget(name: "Sofia", dependencies: ["SofiaCore", "CSherpa"]),
         .testTarget(name: "SofiaCoreTests", dependencies: ["SofiaCore"]),
     ]
 )

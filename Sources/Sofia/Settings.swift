@@ -65,7 +65,7 @@ final class AppSettings: ObservableObject {
         thinking = d.bool(forKey: "thinking")
         phoneProvider = d.string(forKey: "phoneProvider") ?? "ollama"
         phoneModel = d.string(forKey: "phoneModel") ?? ""
-        voiceName = d.string(forKey: "voiceName") ?? ""
+        voiceName = SofiaVoice.resolve(d.string(forKey: "voiceName") ?? "").id
         elevenLabsVoice = d.string(forKey: "elevenLabsVoice") ?? ""
         wakeWord = flag("wakeWord", true)
         casualWake = flag("casualWake", true)

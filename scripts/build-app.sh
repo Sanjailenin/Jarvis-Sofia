@@ -26,5 +26,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 IDENTITY="${SOFIA_SIGN_IDENTITY:--}"
-codesign --force --deep --options runtime --sign "$IDENTITY" "$APP" 2>&1 | grep -v "replacing existing signature" || true
+ENT=build/Sofia.entitlements
+cat > "$ENT" <<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>com.apple.security.cs.disable-library-validation</key><true/>
+</dict></plist>
+XML
+codesign --force --deep --options runtime --entitlements "$ENT" --sign "$IDENTITY" "$APP" 2>&1 | grep -v "replacing existing signature" || true
 echo "Built $APP (signed with: $IDENTITY)"

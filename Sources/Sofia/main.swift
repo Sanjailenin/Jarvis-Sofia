@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        Kokoro.shared.warm()
         panel = NotchPanel(model: controller.model) { [weak self] in self?.controller.escapePressed() }
         controller.panel = panel
         panel.orderFrontRegardless()

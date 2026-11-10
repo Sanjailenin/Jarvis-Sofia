@@ -2,7 +2,7 @@
 
 A voice assistant that lives in the notch of your Mac. Give her any name you like and pick her voice at setup, then say "Hey <her name>", ask for something, and she does it on the Mac: opens apps and sites, moves windows, plays music, types for you, changes settings. Message her from your phone and she sends you a file from the laptop, a screenshot, or tells you whether it is still on.
 
-Everything runs on your Mac. The model is a local open model through Ollama. Speech recognition is Apple's on-device engine. Her voice is a British system voice. Nothing leaves the machine except your own Telegram bot and, only if you add keys, ElevenLabs or a cloud model for messages from your phone.
+Everything runs on your Mac. The model is a local open model through Ollama. Speech recognition is Apple's on-device engine. Her voice is one of six natural voices (four women, two men) generated on the Mac by [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), both Apache-2.0. Nothing leaves the machine except your own Telegram bot and, only if you add keys, ElevenLabs or a cloud model for messages from your phone.
 
 ## Install
 
@@ -14,7 +14,7 @@ You need a Mac on macOS 13 or later. Apple silicon is recommended; 16 GB of memo
 curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/install.sh | bash
 ```
 
-The script does, in order: uses Ollama if you already have it, or downloads the official Ollama app from ollama.com and starts it (no Homebrew, no password), pulls a model sized to your Mac's memory (about 5 GB for 16 GB Macs, 9 GB for 32 GB), downloads the latest Sofia release, checks its SHA-256 against the published checksum, puts `Sofia.app` in `/Applications` (or `~/Applications` if you are not an administrator), and opens it. Read the script first if you like: it is short and plain bash. The ready-made app is for Apple silicon; on an Intel Mac, build from source (option 3).
+The script does, in order: uses Ollama if you already have it, or downloads the official Ollama app from ollama.com and starts it (no Homebrew, no password), pulls a model sized to your Mac's memory (about 5 GB for 16 GB Macs, 9 GB for 32 GB), downloads her voices once (about 360 MB, checked against pinned SHA-256 sums, kept in `~/Library/Application Support/Sofia/Voices`), downloads the latest Sofia release, checks its SHA-256 against the published checksum, puts `Sofia.app` in `/Applications` (or `~/Applications` if you are not an administrator), and opens it. Read the script first if you like: it is short and plain bash. The ready-made app is for Apple silicon; on an Intel Mac, build from source (option 3).
 
 Pick a different model with `SOFIA_MODEL=qwen3:14b` in front of the command. Remove everything later with:
 
@@ -27,6 +27,11 @@ curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/insta
 1. Install Ollama from [ollama.com](https://ollama.com) or `brew install ollama`, start it, and run `ollama pull qwen3:8b`.
 2. Download `Sofia.zip` from the [latest release](https://github.com/Sanjailenin/Jarvis-Sofia/releases/latest), unzip it, and move `Sofia.app` to Applications.
 3. The app is not notarized yet, so the first time right-click it, choose Open, and confirm.
+4. Add her voices (about 360 MB, once); until then she uses the Mac's own voice:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/install.sh | bash -s -- --voices
+```
 
 ### Option 3: build from source
 
@@ -40,7 +45,7 @@ Needs the Xcode Command Line Tools (`xcode-select --install`), nothing else.
 
 ### First run
 
-A welcome window asks two things: **her name** (the default is Sofia; whatever you choose becomes the wake phrase, "Hey <name>") and **her voice**, chosen from every voice installed on your Mac with a Preview button, British voices first. Both can be changed later in Settings. Then macOS asks for permissions as they are needed:
+A welcome window asks two things: **her name** (the default is Sofia; whatever you choose becomes the wake phrase, "Hey <name>") and **her voice**: Heart, Kore, Sarah or Aoede (women), Puck or Fenrir (men), with a Preview button. These six scored best of 32 voices tested for naturalness and clarity. Both can be changed later in Settings. Then macOS asks for permissions as they are needed:
 
 | Permission | Why | Needed for |
 |---|---|---|

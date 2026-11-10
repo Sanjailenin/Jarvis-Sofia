@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 import SofiaCore
 
@@ -23,16 +22,12 @@ struct SetupView: View {
             GroupBox("Her voice") {
                 VStack(alignment: .leading, spacing: 8) {
                     Picker("Voice", selection: $settings.voiceName) {
-                        Text("Best British voice available").tag("")
-                        ForEach(SetupState.groups, id: \.title) { group in
-                            Section(group.title) {
-                                ForEach(group.voices, id: \.identifier) { v in Text("\(v.name) · \(v.language)\(v.quality == .enhanced || v.quality == .premium ? " · enhanced" : "")").tag(v.identifier) }
-                            }
-                        }
+                        Section("Women") { ForEach(SofiaVoice.all.filter { $0.gender == .woman }) { v in Text(v.name).tag(v.id) } }
+                        Section("Men") { ForEach(SofiaVoice.all.filter { $0.gender == .man }) { v in Text(v.name).tag(v.id) } }
                     }
                     HStack {
                         Button(state.previewing ? "Speaking…" : "Preview") { state.preview(name: settings.assistantName.isEmpty ? WakeWord.defaultName : settings.assistantName, voice: settings.voiceName) }.disabled(state.previewing)
-                        Text("Enhanced voices such as Daniel, Serena or Kate download from System Settings → Accessibility → Spoken Content → System Voice → Manage Voices.").font(.caption).foregroundStyle(.secondary)
+                        Text(Kokoro.installed ? "Natural voices that run on this Mac." : "Her voices aren't downloaded yet; the Mac's own voice is used until you run the installer again.").font(.caption).foregroundStyle(.secondary)
                     }
                 }.padding(6)
             }
@@ -63,15 +58,6 @@ final class SetupState: ObservableObject {
     @Published var previewing = false
     @Published var ollama = ""
     private let speech = Speech()
-
-    struct Group { let title: String; let voices: [AVSpeechSynthesisVoice] }
-    static var groups: [Group] {
-        let all = AVSpeechSynthesisVoice.speechVoices().filter { !$0.identifier.contains("eloquence") }
-        let british = all.filter { $0.language.hasPrefix("en-GB") || $0.language.hasPrefix("en-IE") }
-        let english = all.filter { $0.language.hasPrefix("en") && !british.contains($0) }
-        let other = all.filter { !$0.language.hasPrefix("en") }
-        return [Group(title: "British and Irish", voices: british.sorted { $0.name < $1.name }), Group(title: "Other English", voices: english.sorted { $0.name < $1.name }), Group(title: "Other languages", voices: other.sorted { $0.name < $1.name })].filter { !$0.voices.isEmpty }
-    }
 
     func preview(name: String, voice: String) {
         previewing = true

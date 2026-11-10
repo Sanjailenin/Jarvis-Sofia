@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import SofiaCore
 
 @MainActor
 final class Speech: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate {
@@ -15,22 +16,17 @@ final class Speech: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate
     private var elevenLabsKey: String?
     private var elevenLabsVoice = ""
     private var prefetch: [String: Data] = [:]
+    private var local: [Int: Task<Data?, Never>] = [:]
+    private var added = 0, played = 0, epoch = 0
 
     override init() { super.init(); synth.delegate = self }
 
-    static var britishVoices: [AVSpeechSynthesisVoice] {
-        let preferred = ["Daniel", "Serena", "Kate", "Oliver", "Stephanie"]
-        let gb = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("en-GB") }
-        return gb.sorted { a, b in
-            let ia = preferred.firstIndex(where: { a.name.hasPrefix($0) }) ?? 99, ib = preferred.firstIndex(where: { b.name.hasPrefix($0) }) ?? 99
-            if ia != ib { return ia < ib }
-            return a.quality.rawValue > b.quality.rawValue
-        }
-    }
+    static let installCommand = "curl -fsSL https://raw.githubusercontent.com/Sanjailenin/Jarvis-Sofia/main/install.sh | bash -s -- --voices"
 
-    static func voice(named name: String) -> AVSpeechSynthesisVoice? {
-        if !name.isEmpty, let v = AVSpeechSynthesisVoice.speechVoices().first(where: { $0.name == name || $0.identifier == name }) { return v }
-        return britishVoices.first ?? AVSpeechSynthesisVoice(language: "en-GB")
+    static func appleVoice(for voice: SofiaVoice) -> AVSpeechSynthesisVoice? {
+        let installed = AVSpeechSynthesisVoice.speechVoices()
+        for name in voice.appleFallback { if let v = installed.first(where: { $0.name == name && $0.language.hasPrefix("en") }) { return v } }
+        return AVSpeechSynthesisVoice(language: "en-US")
     }
 
     func begin(voice: String, elevenLabsKey: String?, elevenLabsVoice: String, onLevel: @escaping (Float) -> Void, onDone: @escaping () -> Void) {
@@ -44,9 +40,15 @@ final class Speech: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate
         let s = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { return }
         queue.append(s)
-        if let key = elevenLabsKey, !key.isEmpty, prefetch[s] == nil, queue.count <= 2 {
-            Task { [weak self] in if let d = await Speech.elevenLabs(s, key: key, voice: self?.elevenLabsVoice ?? "") { self?.prefetch[s] = d } }
+        if let key = elevenLabsKey, !key.isEmpty {
+            if prefetch[s] == nil, queue.count <= 2 {
+                Task { [weak self] in if let d = await Speech.elevenLabs(s, key: key, voice: self?.elevenLabsVoice ?? "") { self?.prefetch[s] = d } }
+            }
+        } else if Kokoro.installed {
+            let v = SofiaVoice.resolve(voice)
+            local[added] = Task { await Kokoro.shared.wav(s, voice: v) }
         }
+        added += 1
         pump()
     }
 
@@ -65,12 +67,22 @@ final class Speech: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate
         }
         queue.removeFirst()
         speaking = true
+        let index = played, round = epoch
+        played += 1
         if let key = elevenLabsKey, !key.isEmpty {
             Task { [weak self] in
                 guard let self else { return }
                 var data = self.prefetch.removeValue(forKey: next)
                 if data == nil { data = await Speech.elevenLabs(next, key: key, voice: self.elevenLabsVoice) }
-                if let data, self.play(mp3: data) { return }
+                guard self.speaking, self.epoch == round else { return }
+                if let data, self.play(audio: data) { return }
+                self.speakLocally(next)
+            }
+        } else if let job = local.removeValue(forKey: index) {
+            Task { [weak self] in
+                let data = await job.value
+                guard let self, self.speaking, self.epoch == round else { return }
+                if let data, self.play(audio: data) { return }
                 self.speakLocally(next)
             }
         } else {
@@ -80,13 +92,13 @@ final class Speech: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate
 
     private func speakLocally(_ text: String) {
         let u = AVSpeechUtterance(string: text)
-        u.voice = Speech.voice(named: voice)
+        u.voice = Speech.appleVoice(for: SofiaVoice.resolve(voice))
         u.rate = AVSpeechUtteranceDefaultSpeechRate
         synth.speak(u)
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 20, repeats: true) { [weak self] _ in Task { @MainActor in self?.onLevel?(Float.random(in: 0.25...0.8)) } }
     }
 
-    private func play(mp3 data: Data) -> Bool {
+    private func play(audio data: Data) -> Bool {
         guard let p = try? AVAudioPlayer(data: data) else { return false }
         player = p; p.delegate = self; p.isMeteringEnabled = true
         guard p.play() else { return false }
@@ -115,6 +127,7 @@ final class Speech: NSObject, AVSpeechSynthesizerDelegate, AVAudioPlayerDelegate
         player?.delegate = nil; player?.stop(); player = nil
         synth.stopSpeaking(at: .immediate)
         queue = []; prefetch = [:]; speaking = false; finished = false
+        local.values.forEach { $0.cancel() }; local = [:]; added = 0; played = 0; epoch += 1
         onLevel = nil; onDone = nil
     }
 
