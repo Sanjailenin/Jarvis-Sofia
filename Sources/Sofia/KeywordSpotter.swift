@@ -35,8 +35,9 @@ final class KeywordSpotter: @unchecked Sendable {
     private func functions() -> Functions? {
         if let fns { return fns }
         if failedLibrary { return nil }
-        guard let h = dlopen(Self.folder.appendingPathComponent("lib/libsherpa-onnx-c-api.dylib").path, RTLD_NOW | RTLD_LOCAL) else {
-            lastError = String(cString: dlerror()); failedLibrary = true; WakeLog.write("keyword spotter: \(lastError)"); return nil
+        let engine = EngineLibrary.open()
+        guard let h = engine.handle else {
+            lastError = engine.error; failedLibrary = true; WakeLog.write("keyword spotter: \(lastError)"); return nil
         }
         func sym<T>(_ name: String, _ type: T.Type) -> T? { dlsym(h, name).map { unsafeBitCast($0, to: type) } }
         guard let create = sym("SherpaOnnxCreateKeywordSpotter", Create.self), let newStream = sym("SherpaOnnxCreateKeywordStream", NewStream.self),

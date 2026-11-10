@@ -79,9 +79,16 @@ public enum KeyMap {
 }
 
 public enum ComputerGuard {
-    public static let blockedBundlePrefixes = ["com.apple.keychainaccess", "com.apple.Passwords", "com.1password", "com.agilebits", "com.bitwarden", "com.lastpass", "com.dashlane", "org.keepassxc", "com.apple.systempreferences.password"]
-    public static func isBlocked(bundleID: String?) -> Bool {
-        guard let b = bundleID?.lowercased() else { return false }
-        return blockedBundlePrefixes.contains { b.hasPrefix($0.lowercased()) }
+    public static let passwordPrefixes = ["com.apple.keychainaccess", "com.apple.Passwords", "com.1password", "com.agilebits", "com.bitwarden", "com.lastpass", "com.dashlane", "org.keepassxc", "com.apple.systempreferences.password"]
+    public static let commandPrefixes = ["com.apple.Terminal", "com.googlecode.iterm2", "dev.warp", "com.mitchellh.ghostty", "net.kovidgoyal.kitty", "org.alacritty", "io.alacritty", "com.github.wez.wezterm", "co.zeit.hyper", "com.apple.ScriptEditor2", "com.apple.Automator", "com.apple.shortcuts", "com.apple.systempreferences", "com.apple.Settings"]
+    public static var blockedBundlePrefixes: [String] { passwordPrefixes + commandPrefixes }
+
+    public static func isBlocked(bundleID: String?) -> Bool { refusal(bundleID: bundleID) != nil }
+
+    public static func refusal(bundleID: String?) -> String? {
+        guard let b = bundleID?.lowercased() else { return nil }
+        if passwordPrefixes.contains(where: { b.hasPrefix($0.lowercased()) }) { return "I don't touch password managers" }
+        if commandPrefixes.contains(where: { b.hasPrefix($0.lowercased()) }) { return "I don't type or click in terminals, script editors, Shortcuts or System Settings; do that part yourself" }
+        return nil
     }
 }

@@ -26,6 +26,7 @@ public enum TelegramRouter {
 
     public static func route(_ u: TelegramUpdate, state: inout TelegramState, now: Date = Date()) -> TelegramDecision {
         guard !u.text.isEmpty else { return .ignore }
+        guard u.chatType == "private" else { return state.pairedChat == 0 ? .reply("I only pair with a private chat. Message me directly, not from a group.") : .ignore }
         if state.pairedChat == 0 {
             if let until = state.lockedUntil, now < until { return .ignore }
             state.lockedUntil = nil

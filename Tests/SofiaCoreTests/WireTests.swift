@@ -22,7 +22,7 @@ struct WireTests {
         #expect(body["model"] as? String == "qwen3:8b")
     }
     @Test func telegramUpdatesAndPairing() {
-        let list = TelegramUpdate.list(from: json(#"{"ok":true,"result":[{"update_id":7,"message":{"chat":{"id":42},"from":{"first_name":"Sam"},"text":" send me the thesis "}},{"update_id":8,"message":{"chat":{"id":42},"photo":[]}},{"update_id":9,"edited_message":{}}]}"#))
+        let list = TelegramUpdate.list(from: json(#"{"ok":true,"result":[{"update_id":7,"message":{"chat":{"id":42,"type":"private"},"from":{"first_name":"Sam"},"text":" send me the thesis "}},{"update_id":8,"message":{"chat":{"id":42},"photo":[]}},{"update_id":9,"edited_message":{}}]}"#))
         #expect(list.count == 2 && list[0] == TelegramUpdate(updateID: 7, chatID: 42, text: "send me the thesis", senderName: "Sam") && list[1].text == "")
         #expect(TelegramUpdate.list(from: json(#"{"ok":false}"#)).isEmpty)
         let code = Pairing.code()

@@ -29,7 +29,6 @@ public enum ComputerLoop {
         ToolSpec(name: "scroll", description: "Scroll at a point.", parameters: ["type": "object", "properties": ["x": ["type": "integer"], "y": ["type": "integer"], "direction": ["type": "string", "enum": ["up", "down", "left", "right"]], "amount": ["type": "integer"]], "required": ["x", "y", "direction"]]),
         ToolSpec(name: "done", description: "The task is finished or cannot be finished: say what happened in one or two sentences.", parameters: ["type": "object", "properties": ["summary": ["type": "string"], "success": ["type": "boolean"]], "required": ["summary", "success"]]),
     ]
-    static let blockedApps = ["1Password", "Bitwarden", "Keychain Access", "LastPass", "Dashlane", "KeePassXC"]
 
     public static func system(goal: String) -> String {
         """

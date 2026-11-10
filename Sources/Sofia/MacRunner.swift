@@ -35,11 +35,10 @@ enum MacRunner {
             guard let u = URL(string: a.target) else { throw Failure("bad address") }
             NSWorkspace.shared.open(u)
         case .openPath:
-            let path = (a.target as NSString).expandingTildeInPath
+            let path = URL(fileURLWithPath: (a.target as NSString).expandingTildeInPath).resolvingSymlinksInPath().path
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else { throw Failure("not found") }
-            if !isDir.boolValue, FileManager.default.isExecutableFile(atPath: path) { throw Failure("programs aren't opened this way") }
-            if isDir.boolValue, path.hasSuffix(".app") { throw Failure("use open app for apps") }
+            if let why = MacAction.openRefusal(path: path, isDirectory: isDir.boolValue, isExecutable: FileManager.default.isExecutableFile(atPath: path)) { throw Failure(why) }
             NSWorkspace.shared.open(URL(fileURLWithPath: path))
         case .setVolume:
             let level = a.value == "up" ? "(output volume of (get volume settings)) + 10" : a.value == "down" ? "(output volume of (get volume settings)) - 10" : "\(Int(a.value) ?? 50)"
@@ -66,6 +65,7 @@ enum MacRunner {
             let out = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop/Sofia screenshot \(f.string(from: Date())).png").path
             try tool("/usr/sbin/screencapture", ["-x", out])
         case .typeText:
+            if let why = ComputerGuard.refusal(bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier) { throw Failure(why) }
             try script("tell application \"System Events\" to keystroke \(MacAction.appleScriptString(a.target))")
         case .webSearch:
             guard let u = MacAction.searchURL(a.target, site: a.value) else { throw Failure("unknown search site") }

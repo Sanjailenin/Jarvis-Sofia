@@ -96,7 +96,19 @@ public struct MacAction: Equatable {
     public let target: String
     public let value: String
 
-    public static let scriptyExtensions: Set<String> = ["app", "command", "sh", "bash", "zsh", "tool", "pkg", "mpkg", "dmg", "scpt", "applescript", "workflow", "terminal", "py", "rb", "pl", "jar", "exe"]
+    public static let scriptyExtensions: Set<String> = [
+        "app", "command", "sh", "bash", "zsh", "fish", "csh", "ksh", "tool", "pkg", "mpkg", "dmg", "scpt", "scptd", "applescript", "workflow", "wflow", "action", "shortcut", "terminal",
+        "py", "rb", "pl", "php", "js", "jar", "jnlp", "exe", "fileloc", "webloc", "inetloc", "url", "prefpane", "saver", "qlgenerator", "mobileconfig", "kext", "plugin", "bundle",
+        "osax", "service", "xpc", "appex", "framework", "dylib", "so", "mdimporter", "wdgt",
+    ]
+
+    public static func openRefusal(path: String, isDirectory: Bool, isExecutable: Bool) -> String? {
+        let ext = (path as NSString).pathExtension.lowercased()
+        if ext == "app" { return "use open app for apps" }
+        if scriptyExtensions.contains(ext) { return "that kind of file can run code, so I don't open it this way" }
+        if !isDirectory, isExecutable { return "programs aren't opened this way" }
+        return nil
+    }
 
     public init?(_ raw: [String: Any]) {
         guard let k = Kind(rawValue: raw["action"] as? String ?? "") else { return nil }

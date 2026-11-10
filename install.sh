@@ -66,6 +66,8 @@ find_ollama_cli() {
   fi
 }
 
+OLLAMA_TEAM="3MU9H2V9Y9"
+
 install_ollama() {
   say "Installing Ollama (the local model runner, about 230 MB)"
   local tmp
@@ -73,6 +75,7 @@ install_ollama() {
   curl -fL --progress-bar -o "$tmp/Ollama.zip" https://ollama.com/download/Ollama-darwin.zip </dev/null || die "Couldn't download Ollama. Install it from https://ollama.com and run this again."
   ditto -x -k "$tmp/Ollama.zip" "$tmp" </dev/null || die "Couldn't unpack Ollama."
   [ -d "$tmp/Ollama.app" ] || die "The Ollama download didn't contain Ollama.app."
+  codesign --verify --deep --strict -R="anchor apple generic and certificate leaf[subject.OU] = \"$OLLAMA_TEAM\"" "$tmp/Ollama.app" </dev/null 2>/dev/null || { rm -rf "$tmp"; die "The Ollama download isn't signed by Ollama; not installing it. Install it from https://ollama.com and run this again."; }
   rm -rf "$APP_DIR/Ollama.app"
   mv "$tmp/Ollama.app" "$APP_DIR/Ollama.app"
   xattr -dr com.apple.quarantine "$APP_DIR/Ollama.app" 2>/dev/null || true

@@ -33,8 +33,9 @@ final class Kokoro: @unchecked Sendable {
         if tts != nil { return true }
         if failed { return false }
         guard Self.installed else { lastError = "voices not downloaded"; return false }
-        guard let h = dlopen(Self.library.path, RTLD_NOW | RTLD_LOCAL) else {
-            lastError = String(cString: dlerror()); failed = true; return false
+        let engine = EngineLibrary.open()
+        guard let h = engine.handle else {
+            lastError = engine.error; failed = true; return false
         }
         guard let c = dlsym(h, "SherpaOnnxCreateOfflineTts"), let g = dlsym(h, "SherpaOnnxOfflineTtsGenerateWithConfig"), let f = dlsym(h, "SherpaOnnxDestroyOfflineTtsGeneratedAudio") else {
             lastError = "engine functions missing"; failed = true; return false

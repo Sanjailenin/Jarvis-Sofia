@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" width="160" alt="SOFIA logo"></p>
+
 # SOFIA
 
 A voice assistant that lives in the notch of your Mac. Give her any name you like and pick her voice at setup, then say "Hey <her name>", ask for something, and she does it on the Mac: opens apps and sites, moves windows, plays music, types for you, changes settings. Message her from your phone and she sends you a file from the laptop, a screenshot, or tells you whether it is still on.

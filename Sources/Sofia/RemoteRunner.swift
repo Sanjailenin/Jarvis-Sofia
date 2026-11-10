@@ -8,7 +8,7 @@ enum RemoteRunner {
     static let downloadCap = 500 * 1024 * 1024
 
     static func run(_ command: RemoteCommand, settings: AppSettings) async -> Outcome {
-        WakeLog.event("remote \(command)")
+        WakeLog.event("remote \(String("\(command)".prefix(while: { $0 != "(" })))")
         switch command {
         case .help: return Outcome(text: RemoteCommand.helpText)
         case .status: return Outcome(text: status())
@@ -109,6 +109,10 @@ enum RemoteRunner {
             var n = 2
             while FileManager.default.fileExists(atPath: dest.path) { dest = downloads.appendingPathComponent("\((name as NSString).deletingPathExtension) \(n).\((name as NSString).pathExtension)"); n += 1 }
             try FileManager.default.moveItem(at: tmp, to: dest)
+            var marked = dest
+            var values = URLResourceValues()
+            values.quarantineProperties = [kLSQuarantineAgentNameKey as String: "Sofia", kLSQuarantineTypeKey as String: kLSQuarantineTypeWebDownload as String, kLSQuarantineDataURLKey as String: url.absoluteString]
+            do { try marked.setResourceValues(values) } catch { try? FileManager.default.removeItem(at: dest); return Outcome(text: "Couldn't mark the download as coming from the internet, so I deleted it.") }
             try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: dest.path)
             return Outcome(text: "Saved \(dest.lastPathComponent) (\(FilePolicy.sizeText(size))) to Downloads.")
         } catch { return Outcome(text: "Couldn't download: \(error.localizedDescription)") }
