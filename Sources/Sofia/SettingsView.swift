@@ -186,7 +186,14 @@ struct ScreenAccessRow: View {
             row("Screen Recording", on: screen, pane: "Privacy_ScreenCapture") { ScreenCapture.requestPermission() }
             row("Accessibility", on: input, pane: "Privacy_Accessibility") { InputDriver.requestPermission() }
             if !screen || !input {
-                Text("Screen tasks need both. Click Allow, turn Sofia on in the list that opens (use + and pick Sofia from Applications if it isn't listed), then quit and reopen Sofia.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Button("Reset Sofia's screen permissions and ask again") {
+                    for service in ["Accessibility", "ScreenCapture"] {
+                        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil"); p.arguments = ["reset", service, Bundle.main.bundleIdentifier ?? "dev.sofia.app"]
+                        try? p.run(); p.waitUntilExit()
+                    }
+                    InputDriver.requestPermission(); ScreenCapture.requestPermission()
+                }
+                Text("Screen tasks need both. Click Allow and turn Sofia on in the list that opens. If Sofia is already on there but this still says not allowed, the entry is from an older version: click Reset above, allow both again when macOS asks, then quit and reopen Sofia. Screen tasks need “Screen & System Audio Recording”, not “System Audio Recording Only”.").font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

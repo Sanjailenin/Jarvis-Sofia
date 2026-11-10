@@ -19,8 +19,8 @@ struct MacPerformer: ActionPerformer {
             if !screen { ScreenCapture.requestPermission() }
             return (input, screen)
         }
-        guard access.input else { return "I need Accessibility permission to use the mouse and keyboard. macOS has just asked: turn Sofia on in System Settings, Privacy and Security, Accessibility, then ask me again." }
-        guard access.screen else { return "I need Screen Recording permission to see the screen. macOS has just asked: turn Sofia on in System Settings, Privacy and Security, Screen and System Audio Recording, then quit and reopen me and ask again." }
+        guard access.input else { return "I need Accessibility permission to use the mouse and keyboard. In System Settings, Privacy and Security, Accessibility, turn Sofia on. If it already looks on, an update made it stale: select Sofia, click minus, add it again with plus, then ask me again." }
+        guard access.screen else { return "I need Screen Recording permission to see the screen. In System Settings, Privacy and Security, Screen and System Audio Recording, turn Sofia on. If it already looks on, remove Sofia with minus and add it again with plus. Then quit and reopen me and ask again." }
         let provider = await MainActor.run { settings.visionProvider }
         WakeLog.event("computer task")
         return await ComputerLoop.run(goal: goal, host: MacComputerHost(), provider: provider) { p in progress(p); progressSink(p) }

@@ -104,5 +104,6 @@ WakeLog.event("echo cancellation off (silent input while recording)")
     private func teardown() {
         if engine.isRunning { engine.stop() }
         engine.inputNode.removeTap(onBus: 0)
+        CleanMic.disable(engine)
     }
 }

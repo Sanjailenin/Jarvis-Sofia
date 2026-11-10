@@ -92,8 +92,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 if CommandLine.arguments.contains("--status") {
-    print("Screen Recording: \(CGPreflightScreenCaptureAccess() ? "on" : "off")")
-    print("Accessibility: \(AXIsProcessTrusted() ? "on" : "off")")
+    let status = "Screen Recording: \(CGPreflightScreenCaptureAccess() ? "on" : "off")\nAccessibility: \(AXIsProcessTrusted() ? "on" : "off")\n"
+    print(status, terminator: "")
+    let logs = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Sofia")
+    try? FileManager.default.createDirectory(at: logs, withIntermediateDirectories: true)
+    try? status.write(to: logs.appendingPathComponent("status.txt"), atomically: true, encoding: .utf8)
     exit(0)
 }
 

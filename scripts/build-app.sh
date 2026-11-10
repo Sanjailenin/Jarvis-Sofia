@@ -1,7 +1,7 @@
 #!/bin/zsh
-set -e
+set -e -o pipefail
 cd "$(dirname "$0")/.."
-swift build -c release --build-system native 2>&1 | grep -v "ld: warning" | tail -2
+swift build -c release --build-system native 2>&1 | { grep -v "ld: warning" || true; } | tail -2
 BIN=$(swift build -c release --build-system native --show-bin-path 2>/dev/null)/Sofia
 APP=build/Sofia.app
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS"
@@ -25,7 +25,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSMicrophoneUsageDescription</key><string>Sofia listens for the wake phrase and records what you say after it. Audio stays on this Mac.</string>
 </dict></plist>
 PLIST
-IDENTITY="${SOFIA_SIGN_IDENTITY:--}"
+if [ -n "${SOFIA_SIGN_IDENTITY:-}" ]; then
+  IDENTITY="$SOFIA_SIGN_IDENTITY"
+elif security find-identity -v -p codesigning 2>/dev/null | grep -q '"Sofia Release"'; then
+  IDENTITY="Sofia Release"
+else
+  IDENTITY="-"
+fi
 ENT=build/Sofia.entitlements
 cat > "$ENT" <<XML
 <?xml version="1.0" encoding="UTF-8"?>
