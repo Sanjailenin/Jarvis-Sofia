@@ -148,7 +148,7 @@ final class Controller {
         case .transcribe: transcribe()
         case .transcribeDictation: transcribeDictation()
         case .ask(let t): ask(t)
-        case .speak(let line): if streaming { speech.add(line); speech.finish(); streaming = false } else { speak(line) }
+        case .speak(let line): beginSpeech(); speech.add(line); if !streaming { speech.finish() }
         case .stopSpeaking: speech.stop(); streaming = false; model.level = 0
         case .cancelRequests: generation += 1; work?.cancel(); work = nil; heldClip = nil; speech.stop(); streaming = false; model.level = 0
         case .scheduleErrorDismiss:
@@ -217,8 +217,6 @@ final class Controller {
                 let line = spokenForm(reply: sentence)
                 if spokenCount == 0 {
                     self.streaming = true
-                    self.beginSpeech()
-                    self.speech.add(line)
                     self.dispatch(.replyReady(line))
                 } else { self.speech.add(line) }
                 spokenCount += 1
