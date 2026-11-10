@@ -268,7 +268,7 @@ struct QuickCommandTests {
     }
 
     @Test func anythingMoreGoesToTheModel() {
-        for text in ["find me some calm music", "mute Slack notifications", "play Shape of You", "what's the weather", "next week's meetings", "lock in the plan for tomorrow", "volume 300"] {
+        for text in ["find me some calm music", "mute Slack notifications", "what's the weather", "next week's meetings", "lock in the plan for tomorrow", "volume 300"] {
             #expect(QuickCommand.match(text) == nil, Comment(rawValue: text))
         }
     }
@@ -344,6 +344,8 @@ struct VideoTests {
         let html = #"..."videoId":"abc"... {"videoRenderer":{"videoId":"dQw4w9WgXcQ","thumbnail":{}} ... "videoId":"zzzzzzzzzzz""#
         #expect(MacAction.firstYouTubeVideo(in: html) == "dQw4w9WgXcQ")
         #expect(MacAction.firstYouTubeVideo(in: "no videos here") == nil)
+        let withAd = #"{"adSlotRenderer":{"videoId":"AAAAAAAAAAA"}} {"videoRenderer":{"videoId":"BBBBBBBBBBB","title":{}}}"#
+        #expect(MacAction.firstYouTubeVideo(in: withAd) == "BBBBBBBBBBB")
     }
 
     @Test func playOnYouTubeAndFirstResult() async throws {
@@ -353,12 +355,90 @@ struct VideoTests {
             #expect(QuickCommand.firstResult(t), Comment(rawValue: t))
         }
         #expect(!QuickCommand.firstResult("play the first season of Friends"))
+        #expect(QuickCommand.match("play tum hi ho by arijit singh")?.action.target == "tum hi ho by arijit singh")
+        #expect(QuickCommand.match("play tum hi ho by arijit singh")?.action.kind == .playVideo)
+        #expect(QuickCommand.match("play some jazz on Spotify")?.action.value == "spotify")
+        #expect(QuickCommand.match("play")?.action.kind == .media)
+        #expect(QuickCommand.match("play the music")?.action.kind == .media)
+        #expect(QuickCommand.match("play the first video") == nil)
 
         let performer = FakePerformer()
         let turn = AssistantTurn(memory: FakeMemory(), performer: performer)
         _ = try await turn.run("search lofi music on YouTube", channel: "mac", provider: ScriptedProvider([]), ownerName: "", allowComputer: false)
         let r = try await turn.run("play the first video", channel: "mac", provider: ScriptedProvider([]), ownerName: "", allowComputer: false)
-        #expect(performer.performed.last?.kind == .playVideo && performer.performed.last?.target == "lofi music")
-        #expect(r.reply == "Playing the first video for lofi music.")
+        #expect(performer.performed.last?.kind == .playResult && performer.performed.last?.target == "lofi music" && performer.performed.last?.value == "1")
+        #expect(r.reply == "Playing video 1.")
+    }
+}
+
+struct ScreenGoalTests {
+    @Test func screenRequestsGoToTheScreenTask() async throws {
+        for t in ["click the subscribe button", "scroll down", "skip the ad", "what's on my screen", "Can you click on the search bar and type hello", "fill in this form", "what am I looking at"] {
+            #expect(QuickCommand.screenGoal(t), Comment(rawValue: t))
+        }
+        for t in ["open YouTube", "type hello", "close Safari", "what's the weather", "play the first video"] {
+            #expect(!QuickCommand.screenGoal(t), Comment(rawValue: t))
+        }
+        let performer = FakePerformer()
+        let r = try await AssistantTurn(memory: FakeMemory(), performer: performer).run("skip the ad", channel: "mac", provider: ScriptedProvider([]), ownerName: "", allowComputer: true)
+        #expect(performer.tasks == ["skip the ad"] && r.reply == "Filled in the form.")
+        let off = FakePerformer()
+        _ = try? await AssistantTurn(memory: FakeMemory(), performer: off).run("skip the ad", channel: "mac", provider: ScriptedProvider([ChatReply(text: "Screen control is off.")]), ownerName: "", allowComputer: false)
+        #expect(off.tasks.isEmpty)
+    }
+
+    @Test func aVisionModelWithoutToolsIsExplained() async {
+        struct NoTools: ModelProvider {
+            var label: String { "Ollama qwen2.5vl:7b" }
+            var supportsVision: Bool { true }
+            func chat(_ m: [ChatMessage], tools: [ToolSpec]) async throws -> ChatReply { throw ProviderError("Ollama answered 400: registry.ollama.ai/library/qwen2.5vl:7b does not support tools") }
+        }
+        struct Host: ComputerHost {
+            func screenshot() async throws -> Screenshot { Screenshot(base64: "", width: 10, height: 10, note: "") }
+            func click(x: Int, y: Int, double: Bool, right: Bool) async throws {}
+            func type(_ text: String) async throws {}
+            func key(_ combo: String) async throws {}
+            func scroll(x: Int, y: Int, direction: String, amount: Int) async throws {}
+            func findElements(_ query: String) async throws -> String { "" }
+            func pressElement(_ id: String, text: String?) async throws -> String { "" }
+        }
+        let out = await ComputerLoop.run(goal: "x", host: Host(), provider: NoTools()) { _ in }
+        #expect(out.contains("qwen3-vl:8b"))
+    }
+}
+
+struct ContextSizeTests {
+    @Test func screenshotsGetARoomierContext() {
+        let text = OllamaWire.body(model: "m", messages: [.user("hi")], tools: [], stream: false, think: false)
+        let shot = OllamaWire.body(model: "m", messages: [ChatMessage(role: .user, content: "screen", images: ["abc"])], tools: [], stream: false, think: false)
+        #expect((text["options"] as? [String: Any])?["num_ctx"] as? Int == 8192)
+        #expect((shot["options"] as? [String: Any])?["num_ctx"] as? Int == 16384)
+    }
+}
+
+
+struct OnScreenTests {
+    @Test func nthResultOnThePage() {
+        let cases: [(String, Int)] = [("play the second video in this page", 2), ("Play the second video on this page.", 2), ("click on the third video", 3), ("play the first one", 1), ("open the 4th result", 4), ("play video 5", 5), ("watch the second one on the screen", 2)]
+        for (t, n) in cases { #expect(QuickCommand.resultIndex(t) == n, Comment(rawValue: t)) }
+        #expect(QuickCommand.resultIndex("play the second season of Friends") == nil)
+        #expect(QuickCommand.match("play the second video in this page") == nil)
+    }
+
+    @Test func theVideoOnTheScreenIsNotASearch() {
+        for t in ["play the video in the speech", "play the video on the screen", "play this video", "play the video here", "pause the video", "stop the video on this page"] {
+            #expect(QuickCommand.match(t)?.action.kind == .media, Comment(rawValue: t))
+        }
+        #expect(QuickCommand.match("play tum hi ho")?.action.kind == .playVideo)
+    }
+
+    @Test func resultsPageVideosInOrder() {
+        let html = #"{"videoRenderer":{"videoId":"AAAAAAAAAAA"}} x {"videoRenderer":{"videoId":"BBBBBBBBBBB"}} {"videoRenderer":{"videoId":"AAAAAAAAAAA"}}"#
+        #expect(MacAction.youTubeVideos(in: html) == ["AAAAAAAAAAA", "BBBBBBBBBBB"])
+        #expect(MacAction.isYouTubeResults("https://www.youtube.com/results?search_query=lofi"))
+        #expect(!MacAction.isYouTubeResults("https://www.youtube.com/watch?v=x"))
+        #expect(MacAction(["action": "play_result", "value": "2"])?.value == "2")
+        #expect(MacAction(["action": "play_result", "value": 3])?.value == "3")
+        #expect(MacAction(["action": "play_result", "value": "50"]) == nil)
     }
 }

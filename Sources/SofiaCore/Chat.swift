@@ -139,7 +139,8 @@ public enum AnthropicWire {
 
 public enum OllamaWire {
     public static func body(model: String, messages: [ChatMessage], tools: [ToolSpec], stream: Bool, think: Bool) -> [String: Any] {
-        var out: [String: Any] = ["model": model, "stream": stream, "think": think, "options": ["temperature": 0.4], "keep_alive": "30m", "messages": messages.map(encode)]
+        let images = messages.contains { !$0.images.isEmpty }
+        var out: [String: Any] = ["model": model, "stream": stream, "think": think, "options": ["temperature": 0.4, "num_ctx": images ? 16384 : 8192] as [String: Any], "keep_alive": "30m", "messages": messages.map(encode)]
         if !tools.isEmpty { out["tools"] = tools.map { ["type": "function", "function": ["name": $0.name, "description": $0.description, "parameters": $0.parameters]] } }
         return out
     }

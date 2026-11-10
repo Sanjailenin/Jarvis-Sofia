@@ -52,9 +52,10 @@ enum MacRunner {
             let to = a.value == "toggle" ? "not dark mode" : (a.value == "on" ? "true" : "false")
             try script("tell application \"System Events\" to tell appearance preferences to set dark mode to \(to)")
         case .media:
-            let player = isRunning("com.spotify.client") ? "Spotify" : "Music"
             let verb = ["play_pause": "playpause", "next": "next track", "previous": "previous track"][a.value] ?? "playpause"
-            try script("tell application \"\(player)\" to \(verb)")
+            if isRunning("com.spotify.client") { try script("tell application \"Spotify\" to \(verb)") }
+            else if isRunning("com.apple.Music") { try script("tell application \"Music\" to \(verb)") }
+            else { mediaKey(["play_pause": 16, "next": 17, "previous": 18][a.value] ?? 16) }
         case .wifi:
             guard let dev = wifiDevice() else { throw Failure("no Wi-Fi hardware found") }
             try tool("/usr/sbin/networksetup", ["-setairportpower", dev, a.value])
@@ -76,19 +77,27 @@ enum MacRunner {
         case .playMusic:
             var allowed = CharacterSet.urlQueryAllowed; allowed.remove(charactersIn: "&+=?#/:")
             let q = a.target.addingPercentEncoding(withAllowedCharacters: allowed) ?? ""
-            if appURL(named: "Spotify") != nil, let u = URL(string: "spotify:search:\(q)") { NSWorkspace.shared.open(u) }
-            else if let u = URL(string: "https://music.apple.com/search?term=\(q)") { NSWorkspace.shared.open(u) }
-        case .playVideo:
-            guard let search = MacAction.searchURL(a.target, site: "youtube") else { throw Failure("couldn't search YouTube") }
-            var req = URLRequest(url: search, timeoutInterval: 8)
-            req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
-            req.setValue("en", forHTTPHeaderField: "Accept-Language")
-            if let (data, _) = try? await URLSession.shared.data(for: req), let id = MacAction.firstYouTubeVideo(in: String(decoding: data, as: UTF8.self)), let watch = URL(string: "https://www.youtube.com/watch?v=\(id)") {
-                NSWorkspace.shared.open(watch)
-                return "Playing the first YouTube video for \(a.target)."
+            if a.value.contains("spotify"), appURL(named: "Spotify") != nil, let u = URL(string: "spotify:search:\(q)") {
+                NSWorkspace.shared.open(u)
+                return "Spotify is showing results for \(a.target); pick one to play."
             }
-            NSWorkspace.shared.open(search)
-            return "Couldn't pick a video, so the YouTube results for \(a.target) are open."
+            if a.value.contains("apple"), let u = URL(string: "https://music.apple.com/search?term=\(q)") {
+                NSWorkspace.shared.open(u)
+                return "Apple Music is showing results for \(a.target)."
+            }
+            return try await playYouTube(a.target)
+        case .playVideo:
+            return try await playYouTube(a.target)
+        case .playResult:
+            let n = Int(a.value) ?? 1
+            let front = frontBrowserURL()
+            let page: URL? = front.flatMap { MacAction.isYouTubeResults($0.url) ? URL(string: $0.url) : nil } ?? (a.target.isEmpty ? nil : MacAction.searchURL(a.target, site: "youtube"))
+            guard let page else { throw Failure("there is no YouTube results page open and no recent YouTube search") }
+            let ids = MacAction.youTubeVideos(in: try await youTubePage(page))
+            guard ids.count >= n, let watch = URL(string: "https://www.youtube.com/watch?v=\(ids[n - 1])") else { throw Failure("that page doesn't have \(n) videos") }
+            if let front, MacAction.isYouTubeResults(front.url), (try? script(front.set(watch.absoluteString))) != nil { return "Playing video \(n) of the results." }
+            NSWorkspace.shared.open(watch)
+            return "Playing video \(n) of the results."
         case .openSettings:
             guard let id = MacAction.settingsPages[a.target], let u = URL(string: "x-apple.systempreferences:\(id)") else { throw Failure("unknown settings page") }
             NSWorkspace.shared.open(u)
@@ -161,6 +170,46 @@ enum MacRunner {
         return NSWorkspace.shared.runningApplications.filter {
             $0.bundleIdentifier != Bundle.main.bundleIdentifier &&
             ($0.localizedName ?? "").lowercased().replacingOccurrences(of: " ", with: "") == want
+        }
+    }
+
+    static func youTubePage(_ url: URL) async throws -> String {
+        var req = URLRequest(url: url, timeoutInterval: 8)
+        req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+        req.setValue("en", forHTTPHeaderField: "Accept-Language")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    struct BrowserTab { let url: String; let set: (String) -> String }
+
+    static func frontBrowserURL() -> BrowserTab? {
+        guard let id = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return nil }
+        let chromium = ["com.google.Chrome": "Google Chrome", "com.brave.Browser": "Brave Browser", "com.microsoft.edgemac": "Microsoft Edge", "company.thebrowser.Browser": "Arc"]
+        if let app = chromium[id], let url = try? script("tell application \"\(app)\" to return URL of active tab of front window"), !url.isEmpty {
+            return BrowserTab(url: url) { "tell application \"\(app)\" to set URL of active tab of front window to \(MacAction.appleScriptString($0))" }
+        }
+        if id == "com.apple.Safari", let url = try? script("tell application \"Safari\" to return URL of front document"), !url.isEmpty {
+            return BrowserTab(url: url) { "tell application \"Safari\" to set URL of front document to \(MacAction.appleScriptString($0))" }
+        }
+        return nil
+    }
+
+    static func playYouTube(_ what: String) async throws -> String {
+        guard let search = MacAction.searchURL(what, site: "youtube") else { throw Failure("couldn't search YouTube") }
+        if let html = try? await youTubePage(search), let id = MacAction.firstYouTubeVideo(in: html), let watch = URL(string: "https://www.youtube.com/watch?v=\(id)") {
+            NSWorkspace.shared.open(watch)
+            return "Playing the top YouTube result for \(what)."
+        }
+        NSWorkspace.shared.open(search)
+        return "Couldn't pick a video, so the YouTube results for \(what) are open."
+    }
+
+    static func mediaKey(_ key: Int32) {
+        for down in [true, false] {
+            let flags: Int = down ? 0xA00 : 0xB00
+            let data1 = Int((key << 16) | Int32(flags))
+            NSEvent.otherEvent(with: .systemDefined, location: .zero, modifierFlags: NSEvent.ModifierFlags(rawValue: UInt(flags)), timestamp: 0, windowNumber: 0, context: nil, subtype: 8, data1: data1, data2: -1)?.cgEvent?.post(tap: .cghidEventTap)
         }
     }
 

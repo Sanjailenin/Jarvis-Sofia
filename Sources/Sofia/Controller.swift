@@ -188,6 +188,7 @@ final class Controller {
         work = Task { [weak self] in
             guard let self else { return }
             let text = WakeWord.stripLeading(await LocalEar.transcribe(wav: clip, hints: WakeWord.current.hints, timeout: 12) ?? "")
+            WakeLog.write("request heard: \(text)")
             guard gen == self.generation else { return }
             self.dispatch(.transcribed(text))
         }
@@ -223,6 +224,7 @@ final class Controller {
             } }
             do {
                 let result = try await self.turn.run(text, channel: "mac", provider: self.settings.localProvider, ownerName: self.settings.ownerName, allowComputer: self.settings.allowComputer, assistantName: self.settings.assistantName, onSentence: onSentence)
+                WakeLog.write("did: \(result.performed.joined(separator: " | ")) | failed: \(result.failed.joined(separator: " | ")) | reply: \(result.reply.prefix(160))")
                 guard gen == self.generation else { return }
                 var tail = spokenCount == 0 ? spokenForm(reply: result.reply) : ""
                 if !result.failed.isEmpty { tail += (tail.isEmpty ? "" : " ") + "I couldn't " + result.failed.joined(separator: "; ") + "." }

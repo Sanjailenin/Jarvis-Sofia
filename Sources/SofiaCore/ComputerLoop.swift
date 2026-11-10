@@ -52,7 +52,12 @@ public enum ComputerLoop {
         var recent: [String] = []
         for step in 1...maxSteps {
             let out: ChatReply
-            do { out = try await provider.chat(messages, tools: tools) } catch { return "The model stopped answering: \(error.localizedDescription)" }
+            do { out = try await provider.chat(messages, tools: tools) } catch {
+                let why = error.localizedDescription
+                if why.lowercased().contains("does not support tools") { return "\(provider.label) can see but can't use tools, so it can't work the screen. Set the vision model in Settings to qwen3-vl:8b and run: ollama pull qwen3-vl:8b" }
+                if why.contains("isn't pulled") { return "The vision model isn't downloaded. \(why)" }
+                return "The model stopped answering: \(why)"
+            }
             messages.append(.assistant(out.text, calls: out.calls))
             if out.calls.isEmpty {
                 if !out.text.isEmpty { return out.text }

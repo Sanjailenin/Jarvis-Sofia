@@ -7,7 +7,8 @@ public enum QuickCommand {
         (#"mute(?: the)?(?: sound| audio| volume| mac)?"#, ["action": "mute"], "Muted."),
         (#"unmute(?: the)?(?: sound| audio| volume| mac)?"#, ["action": "unmute"], "Unmuted."),
         (#"(?:pause|stop)(?: the)?(?: music| song| video| playback)?"#, ["action": "media", "value": "play_pause"], "Paused."),
-        (#"(?:resume|play)(?: the)?(?: music| song| video| playback)?"#, ["action": "media", "value": "play_pause"], "Playing."),
+        (#"(?:resume|play|start)(?: the| this)?(?: music| song| video| playback)?(?:\s+(?:on|in)\s+(?:the|this)\s+(?:screen|speech|page|tab))?(?: here)?"#, ["action": "media", "value": "play_pause"], "Playing."),
+        (#"(?:pause|stop)(?: the| this)? video(?:\s+(?:on|in)\s+(?:the|this)\s+(?:screen|speech|page|tab))?(?: here)?"#, ["action": "media", "value": "play_pause"], "Paused."),
         (#"(?:next|skip)(?: the)?(?: song| track)?"#, ["action": "media", "value": "next"], "Next one."),
         (#"(?:previous|last)(?: song| track)?"#, ["action": "media", "value": "previous"], "Previous one."),
         (#"lock(?: the)?(?: screen| mac| computer)?"#, ["action": "lock_screen"], "Locking."),
@@ -41,7 +42,41 @@ public enum QuickCommand {
         if let q = capture(#"^(?:play|watch|put on)\s+(.+?)\s+(?:on|from)\s+youtube$"#, in: core), let a = MacAction(["action": "play_video", "target": q]) {
             return (a, "Playing \(q) on YouTube.")
         }
+        if let q = capture(#"^(?:play|put on)\s+(.+?)\s+(?:on|in)\s+spotify$"#, in: core), let a = MacAction(["action": "play_music", "target": q, "value": "spotify"]) {
+            return (a, "Looking up \(q) on Spotify.")
+        }
+        if !firstResult(text), resultIndex(text) == nil, !mentionsScreen(core), let q = capture(#"^(?:play|put on|watch)\s+(?:me\s+)?(.+)$"#, in: core), q.count >= 3,
+           q.range(of: #"^(?:the |some |a )?(?:music|song|video|playback|it|that|this)$"#, options: .regularExpression) == nil,
+           let a = MacAction(["action": "play_video", "target": q]) {
+            return (a, "Playing \(q).")
+        }
         return nil
+    }
+
+    public static func screenGoal(_ text: String) -> Bool {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard t.count <= 200 else { return false }
+        let patterns = [
+            #"^(?:(?:please|can you|could you)\s+)*(?:click|double[- ]click|right[- ]click|tap|press the|scroll|skip(?: the)? ad|close the|dismiss|select the|choose the|check the box|fill (?:in|out))\b"#,
+            #"^(?:(?:please|can you|could you)\s+)*(?:what(?:'s| is) on (?:my|the) screen|read (?:my|the|this) screen|describe (?:my|the) screen|look at (?:my|the) screen|what am i looking at|what do you see)"#,
+        ]
+        return patterns.contains { t.range(of: $0, options: .regularExpression) != nil }
+    }
+
+    static let ordinals: [String: Int] = ["first": 1, "1st": 1, "one": 1, "second": 2, "2nd": 2, "two": 2, "third": 3, "3rd": 3, "three": 3, "fourth": 4, "4th": 4, "four": 4, "fifth": 5, "5th": 5, "five": 5, "sixth": 6, "6th": 6, "seventh": 7, "7th": 7, "eighth": 8, "8th": 8, "ninth": 9, "9th": 9, "tenth": 10, "10th": 10]
+
+    public static func mentionsScreen(_ t: String) -> Bool {
+        t.range(of: #"\b(?:on|in|from)\s+(?:the|this|my)\s+(?:screen|speech|page|tab|list)\b|\bhere$"#, options: .regularExpression) != nil
+    }
+
+    public static func resultIndex(_ text: String) -> Int? {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let pattern = #"^(?:(?:please|can you|could you)\s+)*(?:play|open|click(?: on)?|watch|start|put on)\s+(?:the\s+)?(first|1st|second|2nd|third|3rd|fourth|4th|fifth|5th|sixth|6th|seventh|7th|eighth|8th|ninth|9th|tenth|10th)(?:\s+(?:one|video|result|link))?(?:\s+(?:on|in|from)\s+(?:the|this|my)\s+(?:screen|speech|page|tab|list))?(?:\s+(?:here|please))?[.!]*$"#
+        guard let word = capture(pattern, in: t) else {
+            if let n = capture(#"^(?:play|open|click(?: on)?|watch)\s+(?:video|result|number)\s+(\d{1,2})\b"#, in: t) { return Int(n) }
+            return nil
+        }
+        return ordinals[word]
     }
 
     public static func firstResult(_ text: String) -> Bool {

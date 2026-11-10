@@ -45,7 +45,7 @@ enum ScreenCapture {
         let ownApps = content.applications.filter { $0.processID == ProcessInfo.processInfo.processIdentifier }
         let filter = SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])
         let b = target.bounds
-        let fit = ScreenScale(displayWidth: b.width, displayHeight: b.height, originX: b.minX, originY: b.minY, displayID: UInt32(target.id))
+        let fit = ScreenScale(displayWidth: b.width, displayHeight: b.height, originX: b.minX, originY: b.minY, displayID: UInt32(target.id), maxWidth: 1024, maxHeight: 640)
         let config = SCStreamConfiguration()
         config.showsCursor = true
         if let region, region.count == 4, let s = current {

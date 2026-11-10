@@ -5,7 +5,7 @@ public struct MacAction: Equatable {
         case openApp = "open_app", quitApp = "quit_app", switchApp = "switch_app", openURL = "open_url", openPath = "open_path"
         case setVolume = "set_volume", mute, unmute, darkMode = "dark_mode", media, wifi, lockScreen = "lock_screen", screenshot
         case typeText = "type_text"
-        case webSearch = "web_search", findFile = "find_file", playMusic = "play_music", playVideo = "play_video", openSettings = "open_settings"
+        case webSearch = "web_search", findFile = "find_file", playMusic = "play_music", playVideo = "play_video", playResult = "play_result", openSettings = "open_settings"
         case clipboardCopy = "clipboard_copy", newNote = "new_note"
         case openDeeplink = "open_deeplink"      // an app link (spotify:, slack://…) from the fixed scheme list
         case moveWindow = "move_window"
@@ -47,9 +47,24 @@ public struct MacAction: Equatable {
     static let domainPattern = #"^(?:[a-z0-9-]+\.)+[a-z]{2,}$"#
     static let siteNamePattern = #"^[a-z0-9][a-z0-9 .'&-]{0,40}$"#
 
+    public static func youTubeVideos(in html: String) -> [String] {
+        guard let re = try? NSRegularExpression(pattern: #""videoRenderer":\{"videoId":"([A-Za-z0-9_-]{11})""#) else { return [] }
+        var seen: [String] = []
+        for m in re.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+            if let r = Range(m.range(at: 1), in: html), !seen.contains(String(html[r])) { seen.append(String(html[r])) }
+        }
+        return seen
+    }
+
+    public static func isYouTubeResults(_ url: String) -> Bool {
+        url.range(of: #"^https://(?:www\.|m\.)?youtube\.com/results\?"#, options: .regularExpression) != nil
+    }
+
     public static func firstYouTubeVideo(in html: String) -> String? {
-        guard let r = html.range(of: #""videoId":"([A-Za-z0-9_-]{11})""#, options: .regularExpression) else { return nil }
-        return String(html[r].dropFirst(11).dropLast(1))
+        for pattern in [#""videoRenderer":\{"videoId":"[A-Za-z0-9_-]{11}""#, #""videoId":"[A-Za-z0-9_-]{11}""#] {
+            if let r = html.range(of: pattern, options: .regularExpression) { return String(html[r].suffix(12).dropLast()) }
+        }
+        return nil
     }
 
     public static func isDomain(_ s: String) -> Bool { s.lowercased().range(of: domainPattern, options: .regularExpression) != nil }
@@ -118,6 +133,8 @@ public struct MacAction: Equatable {
             guard !target.isEmpty, target.count <= 100, target.rangeOfCharacter(from: CharacterSet(charactersIn: "/\\*?")) == nil else { return nil }
         case .playMusic, .playVideo:
             guard !target.isEmpty, target.count <= 120 else { return nil }
+        case .playResult:
+            guard let n = Int(value), (1...20).contains(n), target.count <= 120 else { return nil }
         case .openSettings:
             guard Self.settingsPages[target.lowercased()] != nil else { return nil }
             self.kind = k; self.target = target.lowercased(); self.value = value; return
@@ -184,6 +201,7 @@ public struct MacAction: Equatable {
         case .findFile: return "find \(target)"
         case .playMusic: return "play \(target)"
         case .playVideo: return "play \(target) on YouTube"
+        case .playResult: return "play video \(value) of the results"
         case .openSettings: return "open \(target) settings"
         case .clipboardCopy: return "copy to clipboard"
         case .moveWindow: return "move \(target) \(value.replacingOccurrences(of: "_", with: " "))"

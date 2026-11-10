@@ -22,7 +22,7 @@ struct SettingsView: View {
             Section("Model (runs on this Mac)") {
                 TextField("Ollama address", text: $settings.ollamaURL).textFieldStyle(.roundedBorder)
                 TextField("Model", text: $settings.ollamaModel).textFieldStyle(.roundedBorder)
-                TextField("Vision model for screen tasks (e.g. qwen2.5vl:7b, gemma3:12b)", text: $settings.visionModel).textFieldStyle(.roundedBorder)
+                TextField("Vision model for screen tasks, with vision and tools (e.g. qwen3-vl:8b)", text: $settings.visionModel).textFieldStyle(.roundedBorder)
                 Toggle("Let the model think before answering (slower, more careful)", isOn: $settings.thinking)
                 Toggle("Let her use the screen, mouse and keyboard for multi-step tasks", isOn: $settings.allowComputer)
                 if settings.allowComputer { ScreenAccessRow() }

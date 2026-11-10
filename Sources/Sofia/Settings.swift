@@ -60,7 +60,8 @@ final class AppSettings: ObservableObject {
         WakeWord.current = WakeWord(name: d.string(forKey: "assistantName") ?? WakeWord.defaultName)
         ollamaURL = d.string(forKey: "ollamaURL") ?? "http://localhost:11434"
         ollamaModel = d.string(forKey: "ollamaModel") ?? "qwen3:8b"
-        visionModel = d.string(forKey: "visionModel") ?? "qwen2.5vl:7b"
+        let storedVision = d.string(forKey: "visionModel") ?? ""
+        visionModel = storedVision.isEmpty || storedVision.hasPrefix("qwen2.5vl") ? "qwen3-vl:8b" : storedVision
         allowComputer = flag("allowComputer", true)
         thinking = d.bool(forKey: "thinking")
         phoneProvider = d.string(forKey: "phoneProvider") ?? "ollama"

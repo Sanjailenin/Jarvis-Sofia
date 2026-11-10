@@ -38,8 +38,18 @@ public actor AssistantTurn {
         messages.append(.user(text))
         var performed: [String] = [], failed: [String] = []
         var quickMatch = QuickCommand.match(text)
-        if quickMatch == nil, QuickCommand.firstResult(text), let q = lastVideoSearch[channel], let a = MacAction(["action": "play_video", "target": q]) {
-            quickMatch = (a, "Playing the first video for \(q).")
+        if quickMatch == nil, let n = QuickCommand.resultIndex(text), let a = MacAction(["action": "play_result", "target": lastVideoSearch[channel] ?? "", "value": String(n)]) {
+            quickMatch = (a, "Playing video \(n).")
+        }
+        if quickMatch == nil, allowComputer, QuickCommand.screenGoal(text) {
+            let summary = await performer.computerTask(text) { progress?($0) }
+            performed.append("a screen task")
+            let call = ToolCall(id: "quick_\(UUID().uuidString.prefix(8))", name: "computer_task", arguments: (try? JSONSerialization.data(withJSONObject: ["goal": text])).map { String(decoding: $0, as: UTF8.self) } ?? "{}")
+            messages.append(.assistant("", calls: [call]))
+            messages.append(.tool(call.id, summary))
+            messages.append(.assistant(summary, calls: []))
+            history[channel] = Array(messages.suffix(Self.historyKept))
+            return TurnResult(reply: summary, performed: performed, failed: failed)
         }
         if let quick = quickMatch {
             noteVideo(quick.action, channel: channel)
