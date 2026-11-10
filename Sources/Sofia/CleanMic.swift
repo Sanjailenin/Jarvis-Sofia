@@ -6,6 +6,9 @@ enum CleanMic {
         if !input.isVoiceProcessingEnabled {
             do { try input.setVoiceProcessingEnabled(true) } catch { return false }
         }
+        if #available(macOS 14.0, *) {
+            input.voiceProcessingOtherAudioDuckingConfiguration = AVAudioVoiceProcessingOtherAudioDuckingConfiguration(enableAdvancedDucking: false, duckingLevel: .min)
+        }
         _ = engine.mainMixerNode
         return true
     }
