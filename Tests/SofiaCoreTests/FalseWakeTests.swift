@@ -97,6 +97,13 @@ struct FalseWakeTests {
 struct SplitGreetingTests {
     private let sofia = WakeWord(name: "Sofia")
 
+    @Test func sufiIsHerName() {
+        #expect(sofia.matches("Hey Sufi"))
+        #expect(sofia.matches("hi sufi open spotify"))
+        #expect(!sofia.matches("hey Siri"))
+        #expect(WakeWord(name: "Sophia").matches("Hey Sufi"))
+    }
+
     @Test func aResetInsideOneTaskKeepsTheGreeting() {
         var h = HeardHistory()
         let t = Date()

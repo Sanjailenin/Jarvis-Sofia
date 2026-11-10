@@ -26,7 +26,7 @@ public struct WakeWord: Sendable {
     public static func variants(of name: String) -> [String] {
         let base = name.lowercased()
         if ["sofia", "sophia"].contains(base) {
-            return ["sofia", "sophia", "sofie", "sofiya", "sophie", "safia", "sofi", "sophea", "zofia", "so fear", "so fia", "su"]
+            return ["sofia", "sophia", "sofie", "sofiya", "sophie", "safia", "sofi", "sophea", "zofia", "so fear", "so fia", "sufi", "su"]
         }
         var set: [String] = [base]
         func add(_ v: String) { if !v.isEmpty, !set.contains(v) { set.append(v) } }

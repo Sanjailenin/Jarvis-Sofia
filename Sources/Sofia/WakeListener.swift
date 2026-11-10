@@ -70,7 +70,7 @@ final class WakeListener {
             let floats = UnsafeBufferPointer(start: ch, count: Int(out.frameLength))
             let samples = floats.map { Int16(max(-1, min(1, $0)) * 32767) }
             self.lock.lock(); self.preRoll.append(samples); self.lock.unlock()
-            if self.entranceOn && !self.videoInFront {
+            if self.entranceOn {
                 self.lock.lock(); let hit = self.claps.feed(samples); self.lock.unlock()
                 if hit { DispatchQueue.main.async { self.heardDoubleClap() } }
             }
