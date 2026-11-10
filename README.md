@@ -102,6 +102,7 @@ Files leave the Mac only from the folders you allow (Desktop, Documents, Downloa
 - **She does not hear her name**: short names with clear vowels work best; the wake listener also accepts common misspellings of the name you chose. Speech Recognition and Microphone must be allowed for Sofia; the wake word needs an on-device English model, which macOS downloads under System Settings → General → Language & Region. Check the menu bar icon is not the slashed one (standby).
 - **Nothing happens on the Mac when she says she did it**: Accessibility is off for Sofia. System Settings → Privacy & Security → Accessibility.
 - **Telegram does not answer**: the token was saved without pressing Return, or the chat is not paired. Unpair and send the new code.
+- **"Wake with Hey <her name>" won't stay on?** macOS hasn't allowed speech recognition or the microphone for Sofia. Settings shows the reason under the switch with steps and a button to the right pane. In short: System Settings → Privacy & Security → Speech Recognition (and Microphone) → turn Sofia on; if Sofia isn't listed, quit and reopen it and click Allow. After an update macOS can treat Sofia as a new app, so turn its entry off and on again. Then flip the switch on.
 - **What woke her?** `~/Library/Logs/Sofia/events.log` lists every trigger with the app that was in front. It never contains what you said.
 
 ## Privacy and safety

@@ -41,7 +41,20 @@ struct SettingsView: View {
             }
             Section("Wake") {
                 Toggle("Wake with “Hey \(settings.assistantName)” (on this Mac only)", isOn: $settings.wakeWord)
-                if !settings.wakeMessage.isEmpty { Text(settings.wakeMessage).font(.caption).foregroundStyle(.red) }
+                if !settings.wakeMessage.isEmpty {
+                    let help = WakeHelp(message: settings.wakeMessage, name: settings.assistantName)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(settings.wakeMessage).font(.callout.bold()).foregroundStyle(.red)
+                        Text("To turn it on:").font(.caption.bold())
+                        ForEach(Array(help.steps.enumerated()), id: \.offset) { i, step in
+                            Text("\(i + 1). \(step)").font(.caption).fixedSize(horizontal: false, vertical: true)
+                        }
+                        HStack {
+                            Button(help.button) { NSWorkspace.shared.open(help.url) }
+                            Button("Try again") { settings.wakeWord = true }
+                        }
+                    }.padding(.vertical, 4)
+                }
                 Toggle("Just “\(settings.assistantName), …” for 10 minutes after a conversation", isOn: $settings.casualWake).disabled(!settings.wakeWord)
                 Toggle("Keep listening after she answers", isOn: $settings.conversation)
                 Toggle("Noise suppression and echo cancellation", isOn: $settings.cleanAudio)
@@ -103,4 +116,43 @@ final class SecretFields: ObservableObject {
     @Published var openAIKey = ""
     @Published var anthropicKey = ""
     @Published var ollamaState = ""
+}
+
+struct WakeHelp {
+    let steps: [String]
+    let button: String
+    let url: URL
+
+    init(message: String, name: String) {
+        let privacy = "x-apple.systempreferences:com.apple.preference.security?"
+        if message.contains("Microphone") {
+            steps = [
+                "Click Open Microphone Settings below. System Settings opens at Privacy & Security → Microphone.",
+                "Find Sofia in the list and turn its switch on. If macOS asks, choose Quit & Reopen.",
+                "If Sofia isn't in the list, quit Sofia from the menu bar, open it again, and allow the microphone when macOS asks.",
+                "Come back here and click Try again.",
+            ]
+            button = "Open Microphone Settings"
+            url = URL(string: privacy + "Privacy_Microphone")!
+        } else if message.contains("no on-device speech model") {
+            steps = [
+                "Click Open Keyboard Settings below.",
+                "Under Dictation, turn Dictation on and set the language to English (United States).",
+                "Wait a minute while macOS downloads the speech model. It stays on this Mac.",
+                "Come back here and click Try again.",
+            ]
+            button = "Open Keyboard Settings"
+            url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!
+        } else {
+            steps = [
+                "Click Open Speech Recognition Settings below. System Settings opens at Privacy & Security → Speech Recognition.",
+                "Find Sofia in the list and turn its switch on.",
+                "If Sofia isn't in the list, quit Sofia from the menu bar, open it again, and click Allow when macOS asks about speech recognition.",
+                "If you updated Sofia, macOS may treat it as a new app: turn the old Sofia entry off and on again, or remove it with the minus button and repeat step 3.",
+                "Come back here and click Try again. Then say “Hey \(name)”.",
+            ]
+            button = "Open Speech Recognition Settings"
+            url = URL(string: privacy + "Privacy_SpeechRecognition")!
+        }
+    }
 }

@@ -107,8 +107,8 @@ final class Controller {
     }
 
     private func applyWake(_ on: Bool) {
-        settings.wakeMessage = ""
         guard on else { wake.stop(); model.wakeListening = false; return }
+        settings.wakeMessage = ""
         WakeListener.prepare { [weak self] ok, why in
             guard let self else { return }
             if ok { self.syncWake() } else { self.settings.wakeMessage = why ?? ""; self.settings.wakeWord = false }
